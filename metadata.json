@@ -1,0 +1,6 @@
+{
+  "name": "ShadowID",
+  "description": "Digital footprint exposure analysis, impersonation detection, and document defense platform engineered for India's digital identity ecosystem.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

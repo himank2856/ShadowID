@@ -1,0 +1,163 @@
+[
+  {
+    "id": "doc-verify-001",
+    "benchmarkCode": "IN-DOC-AADHAAR-CLEAN-01",
+    "category": "Aadhaar",
+    "documentNumberMasked": "•••• •••• 4912",
+    "holderName": "Vikramaditya Sen",
+    "dob": "14/08/1992",
+    "stateOrCircle": "Delhi (NCT)",
+    "validityStatus": "VERIFIED_AUTHENTIC",
+    "authenticityScore": 98,
+    "securityFeatures": {
+      "guillochePattern": true,
+      "microprinting": true,
+      "ghostImage": true,
+      "qrSignatureValid": true,
+      "fontConsistency": true
+    },
+    "detectedAnomalies": [],
+    "ocrExtraction": {
+      "language": "Bilingual (Eng/Hin)",
+      "tokenCount": 38,
+      "sampleSnippet": "भारत सरकार / Government of India\nविक्रमादित्य सेन / Vikramaditya Sen\nजन्म तिथि / DOB: 14/08/1992\nपुरुष / Male",
+      "rawTokens": [
+        { "text": "भारत", "confidence": 99, "x": 10, "y": 12, "width": 45, "height": 18 },
+        { "text": "सरकार", "confidence": 98, "x": 58, "y": 12, "width": 52, "height": 18 },
+        { "text": "Government", "confidence": 99, "x": 10, "y": 28, "width": 80, "height": 14 },
+        { "text": "of", "confidence": 99, "x": 93, "y": 28, "width": 18, "height": 14 },
+        { "text": "India", "confidence": 99, "x": 114, "y": 28, "width": 42, "height": 14 },
+        { "text": "Vikramaditya", "confidence": 97, "x": 10, "y": 65, "width": 95, "height": 16 },
+        { "text": "Sen", "confidence": 98, "x": 108, "y": 65, "width": 35, "height": 16 },
+        { "text": "DOB:", "confidence": 99, "x": 10, "y": 90, "width": 38, "height": 14 },
+        { "text": "14/08/1992", "confidence": 99, "x": 52, "y": 90, "width": 78, "height": 14 }
+      ]
+    }
+  },
+  {
+    "id": "doc-verify-002",
+    "benchmarkCode": "IN-DOC-AADHAAR-TAMPER-02",
+    "category": "Aadhaar",
+    "documentNumberMasked": "•••• •••• 8831",
+    "holderName": "Sunita Verma",
+    "dob": "22/11/1988",
+    "stateOrCircle": "Haryana",
+    "validityStatus": "TAMPERED_NUMERAL",
+    "authenticityScore": 34,
+    "securityFeatures": {
+      "guillochePattern": false,
+      "microprinting": false,
+      "ghostImage": true,
+      "qrSignatureValid": false,
+      "fontConsistency": false
+    },
+    "detectedAnomalies": [
+      "Digital JPEG block compression discontinuity surrounding 4th digit block",
+      "Numeral baseline font thickness mismatch in year of birth (1988 pasted over 1996)",
+      "Secure QR code V2 digital signature cryptographic hash mismatch with visual plain-text"
+    ],
+    "ocrExtraction": {
+      "language": "Bilingual (Eng/Hin)",
+      "tokenCount": 35,
+      "sampleSnippet": "भारत सरकार / Government of India\nसुनीता वर्मा / Sunita Verma\nजन्म तिथि / DOB: 22/11/1988 [ALTERED]\nमहिला / Female",
+      "rawTokens": [
+        { "text": "Sunita", "confidence": 96, "x": 10, "y": 64, "width": 55, "height": 16 },
+        { "text": "Verma", "confidence": 95, "x": 68, "y": 64, "width": 52, "height": 16 },
+        { "text": "22/11/1988", "confidence": 42, "x": 52, "y": 88, "width": 80, "height": 18, "flag": "TAMPERED_DIGITS" }
+      ]
+    }
+  },
+  {
+    "id": "doc-verify-003",
+    "benchmarkCode": "IN-DOC-PAN-CLEAN-01",
+    "category": "PAN",
+    "documentNumberMasked": "ABCPS••••M",
+    "holderName": "Pooja Sharma",
+    "dob": "03/05/1995",
+    "stateOrCircle": "Maharashtra",
+    "validityStatus": "VERIFIED_AUTHENTIC",
+    "authenticityScore": 96,
+    "securityFeatures": {
+      "guillochePattern": true,
+      "microprinting": true,
+      "ghostImage": false,
+      "qrSignatureValid": true,
+      "fontConsistency": true
+    },
+    "detectedAnomalies": [],
+    "ocrExtraction": {
+      "language": "English",
+      "tokenCount": 24,
+      "sampleSnippet": "INCOME TAX DEPARTMENT / GOVT. OF INDIA\nPERMANENT ACCOUNT NUMBER CARD\nABCPS••••M\nPOOJA SHARMA",
+      "rawTokens": [
+        { "text": "INCOME", "confidence": 98, "x": 15, "y": 10, "width": 58, "height": 12 },
+        { "text": "TAX", "confidence": 99, "x": 76, "y": 10, "width": 30, "height": 12 },
+        { "text": "POOJA", "confidence": 98, "x": 15, "y": 55, "width": 50, "height": 14 },
+        { "text": "SHARMA", "confidence": 97, "x": 68, "y": 55, "width": 64, "height": 14 }
+      ]
+    }
+  },
+  {
+    "id": "doc-verify-004",
+    "benchmarkCode": "IN-DOC-PAN-FONT-MISMATCH-02",
+    "category": "PAN",
+    "documentNumberMasked": "BKPPS••••R",
+    "holderName": "Rajesh Kumar Kalia",
+    "dob": "19/01/1984",
+    "stateOrCircle": "Punjab",
+    "validityStatus": "FONT_MISMATCH",
+    "authenticityScore": 41,
+    "securityFeatures": {
+      "guillochePattern": true,
+      "microprinting": false,
+      "ghostImage": false,
+      "qrSignatureValid": false,
+      "fontConsistency": false
+    },
+    "detectedAnomalies": [
+      "PAN 5th character entity code indicates Individual ('P') but father's name font uses Arial Sans instead of standard NSDL OCR-B typeface",
+      "Microtext banner under photo border shows blurred non-continuous raster lines indicative of desktop PDF editor manipulation"
+    ],
+    "ocrExtraction": {
+      "language": "English",
+      "tokenCount": 26,
+      "sampleSnippet": "INCOME TAX DEPARTMENT\nBKPPS••••R\nRAJESH KUMAR KALIA\n[FONT MISMATCH ON FATHER NAME]",
+      "rawTokens": [
+        { "text": "RAJESH", "confidence": 97, "x": 15, "y": 55, "width": 60, "height": 14 },
+        { "text": "KUMAR", "confidence": 96, "x": 78, "y": 55, "width": 55, "height": 14 },
+        { "text": "KALIA", "confidence": 97, "x": 136, "y": 55, "width": 48, "height": 14 }
+      ]
+    }
+  },
+  {
+    "id": "doc-verify-005",
+    "benchmarkCode": "IN-DOC-PASSPORT-CLEAN-01",
+    "category": "Passport",
+    "documentNumberMasked": "Z482••••",
+    "holderName": "Ananya Mukherjee",
+    "dob": "11/12/1997",
+    "stateOrCircle": "West Bengal",
+    "validityStatus": "VERIFIED_AUTHENTIC",
+    "authenticityScore": 99,
+    "securityFeatures": {
+      "guillochePattern": true,
+      "microprinting": true,
+      "ghostImage": true,
+      "qrSignatureValid": true,
+      "fontConsistency": true
+    },
+    "detectedAnomalies": [],
+    "ocrExtraction": {
+      "language": "English",
+      "tokenCount": 42,
+      "sampleSnippet": "REPUBLIC OF INDIA / PASSPORT\nTYPE P / CODE IND / PASSPORT NO Z482••••\nMUKHERJEE << ANANYA <<<<<<<<<<<<<<<<<\nZ482••••<9IND9712111F3108246<<<<<<<<<<<<<<04",
+      "rawTokens": [
+        { "text": "REPUBLIC", "confidence": 99, "x": 10, "y": 10, "width": 75, "height": 14 },
+        { "text": "OF", "confidence": 99, "x": 88, "y": 10, "width": 22, "height": 14 },
+        { "text": "INDIA", "confidence": 99, "x": 113, "y": 10, "width": 50, "height": 14 },
+        { "text": "MRZ-LINE-1", "confidence": 99, "x": 10, "y": 120, "width": 380, "height": 16 },
+        { "text": "MRZ-LINE-2", "confidence": 99, "x": 10, "y": 140, "width": 380, "height": 16 }
+      ]
+    }
+  }
+]

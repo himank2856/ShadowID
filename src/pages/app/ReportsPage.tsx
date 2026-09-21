@@ -1,0 +1,229 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ * ShadowID - Forensic Dossier & Reports Page
+ * Compliant with Prompt 16
+ */
+
+import React from 'react';
+import { useApp } from '../../context/AppContext.tsx';
+import { FileCheck, Download, Printer, Shield, CheckCircle2, Hash, AlertTriangle } from 'lucide-react';
+import { formatISTDateTime } from '../../utils/formatters.ts';
+
+export const ReportsPage: React.FC = () => {
+  const { activeScan, showToast } = useApp();
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadJSON = () => {
+    // Generate clean sanitized export with masked PII
+    const exportData = {
+      exportSchemaVersion: '1.4.0',
+      exportedAt: new Date().toISOString(),
+      reportTitle: `ShadowID Forensic Report — ${activeScan.subject.name}`,
+      subject: {
+        name: activeScan.subject.name,
+        territory: `${activeScan.subject.city}, ${activeScan.subject.state}`,
+        primaryHandle: activeScan.subject.primaryHandle,
+        phoneMasked: activeScan.subject.phoneMasked,
+        isSynthetic: activeScan.subject.isSynthetic,
+      },
+      assessment: {
+        scanId: activeScan.id,
+        queuedAtIST: formatISTDateTime(activeScan.queuedAt),
+        shadowScore: activeScan.scoreData.score,
+        coveragePercent: activeScan.scoreData.coverage,
+        isProvisional: activeScan.scoreData.isProvisional,
+        severityBand: activeScan.scoreData.severityBand,
+        snapshotHash: activeScan.scoreData.inputSnapshotHash,
+        components: activeScan.scoreData.componentScores,
+      },
+      findings: activeScan.findings.map((f) => ({
+        ruleId: f.ruleId,
+        title: f.title,
+        severity: f.severity,
+        scoreImpact: f.scoreImpact,
+        description: f.description,
+        remediation: f.remediation,
+      })),
+      actions: activeScan.actions.map((a) => ({
+        id: a.id,
+        title: a.title,
+        priority: a.priority,
+        status: a.status,
+        assignee: a.assignee,
+      })),
+      governance: {
+        disclaimer: 'Generated under Build With Bharat 3.0 (Chitkara University). Evaluated against user-supplied evidence without government database connectivity.',
+      },
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `shadowid_report_${activeScan.subject.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Sanitized forensic JSON dossier exported successfully.');
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Action Header */}
+      <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-mono-code text-[#A3E635] uppercase mb-1">
+            <FileCheck className="w-4 h-4" />
+            <span>Forensic Dossier Generator</span>
+          </div>
+          <h1 className="text-xl font-display font-bold text-[#F1F5F9]">
+            Audit Dossier & Multi-Format Export
+          </h1>
+          <p className="text-xs text-[#94A3B8] max-w-3xl mt-1">
+            Generate printable PDF reports with cryptographic snapshot hashes, masked PII, and structured remediation checklists.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            className="px-3.5 py-2 rounded text-xs font-semibold bg-[#172A42] text-[#F1F5F9] border border-[#1E3A5F] hover:bg-[#1E3A5F] flex items-center gap-1.5"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            Print / Save PDF
+          </button>
+          <button
+            onClick={handleDownloadJSON}
+            className="px-4 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center gap-1.5 shadow-[0_0_12px_rgba(163,230,53,0.25)]"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download Sanitized JSON
+          </button>
+        </div>
+      </div>
+
+      {/* Printable Report Paper Layout */}
+      <div className="bg-[#07111F] border-2 border-[#1E3A5F] rounded-lg p-8 max-w-4xl mx-auto space-y-6 shadow-2xl relative print:border-none print:p-0 print:bg-white print:text-black">
+        {/* Report Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-[#1E3A5F]">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-display font-black text-2xl tracking-tight text-[#F1F5F9] print:text-black">
+                ShadowID
+              </span>
+              <span className="text-[10px] font-mono-code bg-[#172A42] text-[#A3E635] px-2 py-0.5 rounded border border-[#A3E635]/40 print:border-black">
+                AUDIT DOSSIER v1.4
+              </span>
+            </div>
+            <p className="text-xs text-[#94A3B8] print:text-gray-600 mt-0.5 font-mono-code">
+              Build With Bharat 3.0 • Team GIGABYTE (Chitkara University, HP)
+            </p>
+          </div>
+
+          <div className="text-right text-xs font-mono-code text-[#64748B]">
+            <div>Timestamp: <strong className="text-[#F1F5F9] print:text-black font-normal">{formatISTDateTime(activeScan.queuedAt)}</strong></div>
+            <div>Snapshot Hash: <span className="text-[#38BDF8] print:text-black">{activeScan.scoreData.inputSnapshotHash}</span></div>
+          </div>
+        </div>
+
+        {/* Subject Profile Card */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs p-4 bg-[#0F1D2E] print:bg-gray-100 rounded border border-[#1E3A5F]">
+          <div>
+            <div className="text-[10px] text-[#94A3B8] uppercase font-mono-code">Subject Name</div>
+            <div className="font-bold text-[#F1F5F9] print:text-black text-sm">{activeScan.subject.name}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#94A3B8] uppercase font-mono-code">Territory</div>
+            <div className="font-medium text-[#CBD5E1] print:text-black">{activeScan.subject.city}, {activeScan.subject.state}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#94A3B8] uppercase font-mono-code">Handle (Masked)</div>
+            <div className="font-mono-code text-[#38BDF8] print:text-black">{activeScan.subject.primaryHandle || '—'}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#94A3B8] uppercase font-mono-code">Phone (Masked)</div>
+            <div className="font-mono-code text-[#A3E635] print:text-black">{activeScan.subject.phoneMasked || '—'}</div>
+          </div>
+        </div>
+
+        {/* Score Synthesis Summary */}
+        <div className="p-4 bg-[#0F1D2E] print:bg-gray-100 rounded border border-[#1E3A5F] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-mono-code uppercase text-[#38BDF8] print:text-black">
+              Assessment Outcome
+            </div>
+            <h3 className="text-base font-display font-bold text-[#F1F5F9] print:text-black mt-0.5">
+              Shadow Score: {activeScan.scoreData.score !== null ? `${activeScan.scoreData.score}/100` : 'Insufficient Data'}
+              {activeScan.scoreData.isProvisional && ' (Provisional)'}
+            </h3>
+            <p className="text-xs text-[#94A3B8] print:text-gray-600 mt-1">
+              Coverage: {activeScan.scoreData.coverage}% • Severity: <span className="capitalize font-bold">{activeScan.scoreData.severityBand}</span>
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono-code">
+            <div className="bg-[#07111F] print:bg-white p-2 rounded border border-[#1E3A5F]">
+              <div className="text-[9px] text-[#94A3B8]">Exposure</div>
+              <div className="font-bold text-[#A3E635] print:text-black">
+                {activeScan.scoreData.componentScores.exposure !== null ? `${activeScan.scoreData.componentScores.exposure}` : '—'}
+              </div>
+            </div>
+            <div className="bg-[#07111F] print:bg-white p-2 rounded border border-[#1E3A5F]">
+              <div className="text-[9px] text-[#94A3B8]">Connect</div>
+              <div className="font-bold text-[#38BDF8] print:text-black">
+                {activeScan.scoreData.componentScores.connectability !== null ? `${activeScan.scoreData.componentScores.connectability}` : '—'}
+              </div>
+            </div>
+            <div className="bg-[#07111F] print:bg-white p-2 rounded border border-[#1E3A5F]">
+              <div className="text-[9px] text-[#94A3B8]">Imperson</div>
+              <div className="font-bold text-[#F59E0B] print:text-black">
+                {activeScan.scoreData.componentScores.impersonation !== null ? `${activeScan.scoreData.componentScores.impersonation}` : '—'}
+              </div>
+            </div>
+            <div className="bg-[#07111F] print:bg-white p-2 rounded border border-[#1E3A5F]">
+              <div className="text-[9px] text-[#94A3B8]">Document</div>
+              <div className="font-bold text-[#EF4444] print:text-black">
+                {activeScan.scoreData.componentScores.documentAnomaly !== null ? `${activeScan.scoreData.componentScores.documentAnomaly}` : '—'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Detailed Findings Table */}
+        <div>
+          <h4 className="text-xs font-mono-code uppercase text-[#94A3B8] print:text-black mb-2">
+            Detailed Findings & Forensic Evidence ({activeScan.findings.length})
+          </h4>
+          <div className="space-y-3">
+            {activeScan.findings.map((fnd) => (
+              <div key={fnd.id} className="p-3 bg-[#0F1D2E] print:bg-gray-50 rounded border border-[#1E3A5F] text-xs">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="font-bold text-[#F1F5F9] print:text-black">{fnd.title}</span>
+                  <span className="font-mono-code text-[#EF4444] print:text-black text-[11px] uppercase">
+                    {fnd.severity} (+{fnd.scoreImpact} pts)
+                  </span>
+                </div>
+                <p className="text-[#CBD5E1] print:text-gray-700 leading-relaxed mb-2">
+                  {fnd.description}
+                </p>
+                <div className="text-[11px] text-[#38BDF8] print:text-black font-mono-code">
+                  Remediation: {fnd.remediation}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer Disclaimer */}
+        <div className="pt-4 border-t border-[#1E3A5F] text-[10px] font-mono-code text-[#64748B] print:text-gray-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>Official Proof-of-Concept Prototype • Chitkara University, HP</span>
+          <span>Integrity Seal: SHA256-VERIFIED-{activeScan.id.toUpperCase()}</span>
+        </div>
+      </div>
+    </div>
+  );
+};

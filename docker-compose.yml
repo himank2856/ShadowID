@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/shadowid
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./packages:/app/packages
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: python -m apps.worker.worker
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/shadowid
+    depends_on:
+      - redis
+      - db
+    volumes:
+      - ./apps:/app/apps
+      - ./packages:/app/packages
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "54322:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=shadowid
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+
+volumes:
+  pgdata:

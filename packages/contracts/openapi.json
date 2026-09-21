@@ -1,0 +1,1149 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ShadowID Forensic Core API",
+    "version": "1.4.0",
+    "description": "Production-grade modular monolith backend for ShadowID — Digital footprint exposure intelligence, impersonation detection, and document defense platform engineered for India's digital identity ecosystem. Team GIGABYTE (Anshul, Tanishq, Himank), Build With Bharat 3.0, Chitkara University, Himachal Pradesh."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://api.shadowid.in",
+      "description": "Production API (India Region)"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "summary": "Service Health Probe",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "summary": "Service Readiness Probe",
+        "operationId": "getReadiness",
+        "responses": {
+          "200": {
+            "description": "Dependencies healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "One or more critical dependencies unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "summary": "Get Current Authenticated Profile and Active Workspace",
+        "operationId": "getCurrentUser",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User profile with workspace context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/workspaces": {
+      "get": {
+        "summary": "List User Workspaces",
+        "operationId": "listWorkspaces",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of workspaces",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Workspace" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subjects": {
+      "post": {
+        "summary": "Register Assessment Subject",
+        "operationId": "createSubject",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateSubjectRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subject successfully created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Subject" }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/api/v1/consents": {
+      "post": {
+        "summary": "Record DPDP-Compliant Consent",
+        "operationId": "createConsent",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateConsentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Consent recorded",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ConsentRecord" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/consents/{id}/revoke": {
+      "post": {
+        "summary": "Revoke Consent and Halt Active Scans",
+        "operationId": "revokeConsent",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consent revoked and cleanup dispatched",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/presign": {
+      "post": {
+        "summary": "Generate Short-Lived Private Upload URL",
+        "operationId": "presignUpload",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PresignUploadRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Presigned URL issued",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PresignedUploadResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/uploads/{id}/complete": {
+      "post": {
+        "summary": "Verify and Quarantine Uploaded File",
+        "operationId": "completeUpload",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Upload verified",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FileRecord" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evidence/import": {
+      "post": {
+        "summary": "Import Batch Evidence Tokens",
+        "operationId": "importEvidence",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ImportEvidenceRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Evidence accepted for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/EvidenceAttribute" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scans": {
+      "get": {
+        "summary": "List Workspace Assessment Scans",
+        "operationId": "listScans",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated scan list",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedScans" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Queue New Forensic Scan Job",
+        "operationId": "createScan",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateScanRequest" }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Scan queued successfully in background",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/QueuedScanResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scans/{id}": {
+      "get": {
+        "summary": "Get Detailed Scan Job Status & Results",
+        "operationId": "getScanById",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ScanJob" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/scans/{id}/cancel": {
+      "post": {
+        "summary": "Cancel In-Flight Scan Job",
+        "operationId": "cancelScan",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scan cancelled",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scans/{id}/score": {
+      "get": {
+        "summary": "Retrieve Deterministic Shadow Score & Explainable Breakdown",
+        "operationId": "getScanScore",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shadow Score calculation",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ShadowScoreCalculation" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scans/{id}/graph": {
+      "get": {
+        "summary": "Retrieve Multi-Vector Evidence Correlation Graph",
+        "operationId": "getScanGraph",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Evidence graph nodes and edges",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EvidenceGraph" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comparisons": {
+      "post": {
+        "summary": "Perform Multi-Signal Impersonation Comparison",
+        "operationId": "compareProfiles",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ProfileComparisonRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comparison metrics and verdict",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProfileComparisonData" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/analyze": {
+      "post": {
+        "summary": "Run Tesseract eng/hin OCR and OpenCV Morphological Checks",
+        "operationId": "analyzeDocument",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DocumentAnalysisRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OCR bounding boxes and anomaly findings",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DocumentAnalysisData" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/research/import": {
+      "post": {
+        "summary": "Import iNSIGHTS Manual Deep Search Findings",
+        "operationId": "importResearchClaims",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ImportResearchRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Research claims imported under unreviewed state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ResearchClaim" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/orders": {
+      "post": {
+        "summary": "Create Razorpay Order for 30-Day Pro Pass (₹499)",
+        "operationId": "createBillingOrder",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateOrderRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Razorpay order payload (amount in paise)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BillingOrderResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/verify": {
+      "post": {
+        "summary": "Verify Razorpay Payment Signature and Grant Pro Entitlement",
+        "operationId": "verifyPayment",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VerifyPaymentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment confirmed and Pro pass activated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaymentVerificationResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/webhooks/razorpay": {
+      "post": {
+        "summary": "Razorpay Server Webhook Endpoint",
+        "operationId": "handleRazorpayWebhook",
+        "parameters": [
+          { "name": "X-Razorpay-Signature", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Webhook processed" }
+        }
+      }
+    },
+    "/api/v1/reports": {
+      "post": {
+        "summary": "Generate Sanitized Forensic Dossier (JSON/PDF)",
+        "operationId": "generateReport",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GenerateReportRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report generated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReportRecord" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/actions/{id}": {
+      "patch": {
+        "summary": "Update Action Remediation Lifecycle Status",
+        "operationId": "updateAction",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateActionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ActionItem" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "HealthStatus": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "healthy" },
+          "version": { "type": "string", "example": "1.4.0" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["status", "version", "timestamp"]
+      },
+      "ReadinessStatus": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "ready" },
+          "database": { "type": "boolean" },
+          "redis": { "type": "boolean" },
+          "ocrEngine": { "type": "string", "example": "Tesseract 5.3 (eng+hin)" }
+        },
+        "required": ["status", "database", "redis", "ocrEngine"]
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email" },
+          "fullName": { "type": "string" },
+          "workspaceId": { "type": "string", "format": "uuid" },
+          "role": { "type": "string", "enum": ["owner", "analyst", "viewer"] },
+          "isPro": { "type": "boolean" }
+        },
+        "required": ["id", "email", "fullName", "workspaceId", "role", "isPro"]
+      },
+      "Workspace": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "tier": { "type": "string", "enum": ["free", "pro", "enterprise"] },
+          "retentionDays": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "name", "tier", "retentionDays", "createdAt"]
+      },
+      "CreateSubjectRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string" },
+          "institution": { "type": "string" },
+          "employer": { "type": "string" },
+          "primaryHandle": { "type": "string" },
+          "isSynthetic": { "type": "boolean", "default": false }
+        },
+        "required": ["name", "city", "state"]
+      },
+      "Subject": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "city": { "type": "string" },
+          "state": { "type": "string" },
+          "institution": { "type": "string" },
+          "employer": { "type": "string" },
+          "primaryHandle": { "type": "string" },
+          "phoneMasked": { "type": "string" },
+          "emailMasked": { "type": "string" },
+          "isSynthetic": { "type": "boolean" }
+        },
+        "required": ["id", "name", "city", "state", "isSynthetic"]
+      },
+      "CreateConsentRequest": {
+        "type": "object",
+        "properties": {
+          "subjectId": { "type": "string" },
+          "purpose": { "type": "string" },
+          "permittedModules": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["exposure", "impersonation", "documents", "research"] }
+          },
+          "authorizationBasis": {
+            "type": "string",
+            "enum": ["self", "authorized_representative", "synthetic_demo"]
+          },
+          "retentionDays": { "type": "integer", "default": 30 }
+        },
+        "required": ["subjectId", "purpose", "permittedModules", "authorizationBasis"]
+      },
+      "ConsentRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "subjectId": { "type": "string" },
+          "purpose": { "type": "string" },
+          "permittedModules": { "type": "array", "items": { "type": "string" } },
+          "authorizationBasis": { "type": "string" },
+          "retentionDays": { "type": "integer" },
+          "acceptedAt": { "type": "string", "format": "date-time" },
+          "isRevoked": { "type": "boolean" }
+        },
+        "required": ["id", "subjectId", "purpose", "permittedModules", "acceptedAt", "isRevoked"]
+      },
+      "PresignUploadRequest": {
+        "type": "object",
+        "properties": {
+          "filename": { "type": "string" },
+          "mimeType": { "type": "string" },
+          "fileSizeBytes": { "type": "integer" },
+          "category": { "type": "string", "enum": ["Aadhaar", "PAN", "Passport", "Generic ID", "Profile Screenshot"] }
+        },
+        "required": ["filename", "mimeType", "fileSizeBytes", "category"]
+      },
+      "PresignedUploadResponse": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string", "format": "uuid" },
+          "uploadUrl": { "type": "string" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["fileId", "uploadUrl", "expiresAt"]
+      },
+      "FileRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "filename": { "type": "string" },
+          "mimeType": { "type": "string" },
+          "fileSizeBytes": { "type": "integer" },
+          "status": { "type": "string", "enum": ["quarantined", "ready", "rejected"] }
+        },
+        "required": ["id", "filename", "mimeType", "fileSizeBytes", "status"]
+      },
+      "ImportEvidenceRequest": {
+        "type": "object",
+        "properties": {
+          "subjectId": { "type": "string" },
+          "tokens": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EvidenceAttribute" }
+          }
+        },
+        "required": ["subjectId", "tokens"]
+      },
+      "EvidenceAttribute": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "label": { "type": "string" },
+          "value": { "type": "string" },
+          "sourceType": { "type": "string", "enum": ["telecom", "registry", "social", "document", "upi", "web"] },
+          "sourceName": { "type": "string" },
+          "observedAt": { "type": "string", "format": "date-time" },
+          "extractionMethod": { "type": "string" },
+          "certaintyReason": { "type": "string" },
+          "isConfirmedByReviewer": { "type": "boolean" }
+        },
+        "required": ["key", "label", "value", "sourceType", "sourceName", "observedAt", "isConfirmedByReviewer"]
+      },
+      "CreateScanRequest": {
+        "type": "object",
+        "properties": {
+          "subjectId": { "type": "string" },
+          "consentId": { "type": "string" },
+          "selectedModules": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["exposure", "impersonation", "documents", "research"] }
+          },
+          "syntheticPreset": { "type": "string", "nullable": true }
+        },
+        "required": ["subjectId", "consentId", "selectedModules"]
+      },
+      "QueuedScanResponse": {
+        "type": "object",
+        "properties": {
+          "scanId": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued"] },
+          "statusUrl": { "type": "string" }
+        },
+        "required": ["scanId", "status", "statusUrl"]
+      },
+      "PaginatedScans": {
+        "type": "object",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ScanJob" } },
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "limit": { "type": "integer" }
+        },
+        "required": ["items", "total", "page", "limit"]
+      },
+      "ScanJob": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "subject": { "$ref": "#/components/schemas/Subject" },
+          "consent": { "$ref": "#/components/schemas/ConsentRecord" },
+          "selectedModules": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "string", "enum": ["queued", "running", "succeeded", "partial", "failed", "cancelled"] },
+          "progressPercent": { "type": "integer" },
+          "currentStage": { "type": "string" },
+          "queuedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "scoreData": { "$ref": "#/components/schemas/ShadowScoreCalculation" },
+          "findings": { "type": "array", "items": { "$ref": "#/components/schemas/Finding" } },
+          "evidenceGraph": { "$ref": "#/components/schemas/EvidenceGraph" },
+          "evidenceList": { "type": "array", "items": { "$ref": "#/components/schemas/EvidenceAttribute" } },
+          "profileComparison": { "$ref": "#/components/schemas/ProfileComparisonData", "nullable": true },
+          "documentAnalysis": { "$ref": "#/components/schemas/DocumentAnalysisData", "nullable": true },
+          "researchClaims": { "type": "array", "items": { "$ref": "#/components/schemas/ResearchClaim" }, "nullable": true },
+          "actions": { "type": "array", "items": { "$ref": "#/components/schemas/ActionItem" } }
+        },
+        "required": ["id", "subject", "consent", "selectedModules", "status", "scoreData", "findings", "actions"]
+      },
+      "ShadowScoreCalculation": {
+        "type": "object",
+        "properties": {
+          "score": { "type": "integer", "nullable": true },
+          "coverage": { "type": "integer" },
+          "isProvisional": { "type": "boolean" },
+          "provisionalReason": { "type": "string", "nullable": true },
+          "severityBand": { "type": "string", "enum": ["lower", "moderate", "elevated", "high"] },
+          "componentScores": {
+            "type": "object",
+            "properties": {
+              "exposure": { "type": "integer", "nullable": true },
+              "connectability": { "type": "integer", "nullable": true },
+              "impersonation": { "type": "integer", "nullable": true },
+              "documentAnomaly": { "type": "integer", "nullable": true }
+            }
+          },
+          "contributions": {
+            "type": "object",
+            "properties": {
+              "exposure": { "type": "integer" },
+              "connectability": { "type": "integer" },
+              "impersonation": { "type": "integer" },
+              "documentAnomaly": { "type": "integer" }
+            }
+          },
+          "inputSnapshotHash": { "type": "string" }
+        },
+        "required": ["score", "coverage", "isProvisional", "severityBand", "componentScores", "contributions", "inputSnapshotHash"]
+      },
+      "Finding": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "ruleId": { "type": "string" },
+          "title": { "type": "string" },
+          "module": { "type": "string" },
+          "severity": { "type": "string", "enum": ["lower", "moderate", "elevated", "high"] },
+          "scoreImpact": { "type": "integer" },
+          "description": { "type": "string" },
+          "supportingEvidence": { "type": "array", "items": { "type": "string" } },
+          "confidenceReason": { "type": "string" },
+          "scopeLimitation": { "type": "string" },
+          "remediation": { "type": "string" },
+          "status": { "type": "string", "enum": ["active", "mitigated", "false_positive_rejected"] },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "ruleId", "title", "module", "severity", "scoreImpact", "description", "remediation", "status"]
+      },
+      "EvidenceGraph": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "category": { "type": "string" },
+                "val": { "type": "string" },
+                "riskWeight": { "type": "integer" },
+                "source": { "type": "string" }
+              },
+              "required": ["id", "label", "category", "riskWeight", "source"]
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "source": { "type": "string" },
+                "target": { "type": "string" },
+                "label": { "type": "string" },
+                "relationType": { "type": "string" },
+                "certainty": { "type": "integer" },
+                "isVerified": { "type": "boolean" }
+              },
+              "required": ["id", "source", "target", "label", "certainty", "isVerified"]
+            }
+          }
+        },
+        "required": ["nodes", "edges"]
+      },
+      "ProfileComparisonRequest": {
+        "type": "object",
+        "properties": {
+          "referenceSubjectId": { "type": "string" },
+          "candidateUrl": { "type": "string" },
+          "candidateName": { "type": "string" },
+          "candidateHandle": { "type": "string" },
+          "candidateBio": { "type": "string" }
+        },
+        "required": ["referenceSubjectId", "candidateName", "candidateHandle"]
+      },
+      "ProfileComparisonData": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "referenceSubject": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "handle": { "type": "string" },
+              "bio": { "type": "string" },
+              "institution": { "type": "string" },
+              "city": { "type": "string" },
+              "avatarUrl": { "type": "string" }
+            },
+            "required": ["name", "handle"]
+          },
+          "candidateProfile": {
+            "type": "object",
+            "properties": {
+              "platform": { "type": "string" },
+              "name": { "type": "string" },
+              "handle": { "type": "string" },
+              "bio": { "type": "string" },
+              "location": { "type": "string" }
+            },
+            "required": ["platform", "name", "handle"]
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "nameTokenOverlap": { "type": "integer" },
+              "handleSimilarity": { "type": "integer" },
+              "bioTextOverlap": { "type": "integer" },
+              "avatarPerceptualMatch": { "type": "integer" },
+              "contextualAgreement": { "type": "integer" }
+            },
+            "required": ["nameTokenOverlap", "handleSimilarity", "bioTextOverlap"]
+          },
+          "contradictions": { "type": "array", "items": { "type": "string" } },
+          "verdict": { "type": "string", "enum": ["Limited overlap", "Similarities found", "Needs review", "Insufficient evidence"] },
+          "verdictNotes": { "type": "string" },
+          "reviewerDecision": { "type": "string", "enum": ["dismiss", "flag_for_takedown", "monitor"], "nullable": true }
+        },
+        "required": ["id", "referenceSubject", "candidateProfile", "metrics", "verdict"]
+      },
+      "DocumentAnalysisRequest": {
+        "type": "object",
+        "properties": {
+          "fileId": { "type": "string" },
+          "category": { "type": "string", "enum": ["Aadhaar", "PAN", "Passport", "Generic ID"] }
+        },
+        "required": ["fileId", "category"]
+      },
+      "DocumentAnalysisData": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "documentCategory": { "type": "string" },
+          "sampleLabel": { "type": "string" },
+          "qualityScore": { "type": "integer" },
+          "languageDetected": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["Requires review", "No configured inconsistencies found", "Insufficient image quality"] },
+          "summary": { "type": "string" },
+          "boxes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "value": { "type": "string" },
+                "maskedValue": { "type": "string" },
+                "confidence": { "type": "integer" },
+                "isAnomaly": { "type": "boolean" },
+                "anomalyReason": { "type": "string", "nullable": true }
+              },
+              "required": ["id", "label", "value", "maskedValue", "confidence", "isAnomaly"]
+            }
+          },
+          "inconsistencies": { "type": "array", "items": { "type": "string" } },
+          "isHumanVerified": { "type": "boolean" }
+        },
+        "required": ["id", "documentCategory", "qualityScore", "verdict", "summary", "boxes", "isHumanVerified"]
+      },
+      "ImportResearchRequest": {
+        "type": "object",
+        "properties": {
+          "subjectId": { "type": "string" },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "claim": { "type": "string" },
+                "sourceReference": { "type": "string" },
+                "uncertaintyRating": { "type": "string", "enum": ["low", "moderate", "high"] },
+                "inferenceType": { "type": "string", "enum": ["supplied_fact", "derived_inference", "external_guidance"] }
+              },
+              "required": ["claim", "sourceReference", "uncertaintyRating", "inferenceType"]
+            }
+          }
+        },
+        "required": ["subjectId", "claims"]
+      },
+      "ResearchClaim": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "claim": { "type": "string" },
+          "sourceReference": { "type": "string" },
+          "uncertaintyRating": { "type": "string" },
+          "inferenceType": { "type": "string" },
+          "reviewerStatus": { "type": "string", "enum": ["unreviewed", "accepted", "rejected"] },
+          "reviewerNotes": { "type": "string", "nullable": true }
+        },
+        "required": ["id", "claim", "sourceReference", "uncertaintyRating", "inferenceType", "reviewerStatus"]
+      },
+      "CreateOrderRequest": {
+        "type": "object",
+        "properties": {
+          "plan": { "type": "string", "enum": ["pro_pass_30d"] }
+        },
+        "required": ["plan"]
+      },
+      "BillingOrderResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string" },
+          "amountPaise": { "type": "integer", "example": 49900 },
+          "currency": { "type": "string", "example": "INR" },
+          "keyId": { "type": "string" },
+          "productName": { "type": "string", "example": "ShadowID 30-Day Pro Pass" }
+        },
+        "required": ["orderId", "amountPaise", "currency", "keyId", "productName"]
+      },
+      "VerifyPaymentRequest": {
+        "type": "object",
+        "properties": {
+          "razorpayOrderId": { "type": "string" },
+          "razorpayPaymentId": { "type": "string" },
+          "razorpaySignature": { "type": "string" }
+        },
+        "required": ["razorpayOrderId", "razorpayPaymentId", "razorpaySignature"]
+      },
+      "PaymentVerificationResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "entitlement": { "type": "string" },
+          "validUntilIST": { "type": "string" }
+        },
+        "required": ["success", "entitlement", "validUntilIST"]
+      },
+      "GenerateReportRequest": {
+        "type": "object",
+        "properties": {
+          "scanId": { "type": "string" },
+          "format": { "type": "string", "enum": ["json", "pdf"] }
+        },
+        "required": ["scanId", "format"]
+      },
+      "ReportRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "scanId": { "type": "string" },
+          "format": { "type": "string" },
+          "downloadUrl": { "type": "string" },
+          "snapshotHash": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "scanId", "format", "downloadUrl", "snapshotHash", "createdAt"]
+      },
+      "UpdateActionRequest": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["pending", "in-progress", "resolved"] },
+          "assignee": { "type": "string", "nullable": true }
+        },
+        "required": ["status"]
+      },
+      "ActionItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "findingRef": { "type": "string" },
+          "title": { "type": "string" },
+          "module": { "type": "string" },
+          "priority": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "status": { "type": "string", "enum": ["pending", "in-progress", "resolved"] },
+          "assignee": { "type": "string" },
+          "recommendation": { "type": "string" },
+          "verificationMethod": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "findingRef", "title", "module", "priority", "status", "assignee", "recommendation"]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "message": { "type": "string" },
+          "requestId": { "type": "string" }
+        },
+        "required": ["success", "message", "requestId"]
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication token missing, invalid, or expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string", "example": "AUTH_UNAUTHORIZED" },
+                "message": { "type": "string", "example": "Missing or expired JWT session token" },
+                "requestId": { "type": "string" }
+              },
+              "required": ["code", "message", "requestId"]
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found or inaccessible in current workspace",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string", "example": "RESOURCE_NOT_FOUND" },
+                "message": { "type": "string", "example": "The requested resource does not exist" },
+                "requestId": { "type": "string" }
+              },
+              "required": ["code", "message", "requestId"]
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request payload schema validation failure",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "code": { "type": "string", "example": "VALIDATION_FAILED" },
+                "message": { "type": "string", "example": "Invalid input parameters" },
+                "fieldErrors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": { "type": "string" },
+                      "error": { "type": "string" }
+                    }
+                  }
+                },
+                "requestId": { "type": "string" }
+              },
+              "required": ["code", "message", "requestId"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

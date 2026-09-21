@@ -1,0 +1,102 @@
+[
+  {
+    "id": "imp-verify-001",
+    "benchmarkCode": "IN-IMP-TELEGRAM-CLONE-01",
+    "targetSubject": {
+      "name": "Arun Sharma",
+      "handle": "@arun_sharma_99",
+      "platform": "Telegram",
+      "city": "Chandigarh",
+      "institution": "Punjab Engineering College",
+      "officialUpi": "arun.sharma99@sbi"
+    },
+    "suspectProfile": {
+      "name": "Arun Sharma (Official)",
+      "handle": "@arun_sharma_99_official",
+      "platform": "Telegram",
+      "claimedCity": "Chandigarh / Remote",
+      "bio": "PEC Graduate '24 • Tech Enthusiast • Send support payments directly via arun@okaxis",
+      "avatarSimilarityPercent": 98,
+      "upiPayeeId": "arun@okaxis"
+    },
+    "metrics": {
+      "handleLevenshteinDist": 9,
+      "bioNgramOverlap": 89,
+      "avatarPerceptualDiff": 0.04,
+      "overallMimicryScore": 92
+    },
+    "contradictions": [
+      "Target official UPI payee identifier is 'arun.sharma99@sbi', suspect asks for funds to altered VPA 'arun@okaxis'",
+      "Telegram profile creation timestamp indicates creation 4 days prior, whereas reference handle has 3 years history",
+      "Account handle appends '_official' to simulate authoritative customer service or identity verification"
+    ],
+    "classification": "CONFIRMED_IMPERSONATION",
+    "recommendedAction": "File Telegram Abuse notice for fraud impersonation; notify primary contacts of compromised payment handle"
+  },
+  {
+    "id": "imp-verify-002",
+    "benchmarkCode": "IN-IMP-LINKEDIN-EXECUTIVE-02",
+    "targetSubject": {
+      "name": "Dr. Ananya Mukherjee",
+      "handle": "ananya-mukherjee-phd",
+      "platform": "LinkedIn",
+      "city": "Kolkata",
+      "institution": "Jadavpur University",
+      "officialUpi": "ananya.mukh@hdfcbank"
+    },
+    "suspectProfile": {
+      "name": "Dr. Ananya Mukherjee",
+      "handle": "dr-ananya-mukherjee-recruitment",
+      "platform": "LinkedIn",
+      "claimedCity": "Bangalore / Hybrid",
+      "bio": "Talent Partner & Academic Consultant @ Jadavpur University Alumni • DM for paid fast-track internships",
+      "avatarSimilarityPercent": 94,
+      "upiPayeeId": "edu.fasttrack@ybl"
+    },
+    "metrics": {
+      "handleLevenshteinDist": 14,
+      "bioNgramOverlap": 68,
+      "avatarPerceptualDiff": 0.08,
+      "overallMimicryScore": 86
+    },
+    "contradictions": [
+      "Reference subject is Full-Time Professor in Kolkata with no advisory recruitment consultancy",
+      "Suspect solicits upfront processing fees via UPI for university placement assistance",
+      "Suspect profile has fewer than 40 connections and duplicated reference profile header photography"
+    ],
+    "classification": "HIGH_RISK_MIMICRY",
+    "recommendedAction": "Initiate LinkedIn Member Notice of Unauthorized Representation and issue departmental warning"
+  },
+  {
+    "id": "imp-verify-003",
+    "benchmarkCode": "IN-IMP-HOMONYM-BENIGN-03",
+    "targetSubject": {
+      "name": "Rajesh Kumar",
+      "handle": "@rajesh_kumar_in",
+      "platform": "X (Twitter)",
+      "city": "Lucknow",
+      "institution": "UP Tech University"
+    },
+    "suspectProfile": {
+      "name": "Rajesh Kumar",
+      "handle": "@rajeshkumar_sports",
+      "platform": "X (Twitter)",
+      "claimedCity": "Chennai",
+      "bio": "Cricket enthusiast & amateur photographer based in Tamil Nadu",
+      "avatarSimilarityPercent": 12
+    },
+    "metrics": {
+      "handleLevenshteinDist": 12,
+      "bioNgramOverlap": 4,
+      "avatarPerceptualDiff": 0.85,
+      "overallMimicryScore": 14
+    },
+    "contradictions": [
+      "Different geographic territory (Chennai vs Lucknow)",
+      "Completely different personal portrait and interest graph",
+      "Common Indian personal name with non-overlapping social connections"
+    ],
+    "classification": "BENIGN_HOMONYM",
+    "recommendedAction": "Dismiss candidate profile as natural name collision; no remediation required"
+  }
+]
