@@ -34,7 +34,18 @@ export const AppSidebar: React.FC = () => {
     user,
     role,
     t,
+    openAuthModal,
+    showToast,
   } = useApp();
+
+  const handleNav = (path: string) => {
+    if (path === '/app/scans/new' && !user) {
+      openAuthModal('signin');
+      showToast('Please sign in or create an account to start a scan.');
+      return;
+    }
+    navigate(path);
+  };
 
   const navItems = [
     { label: t.navOverview, path: '/app/overview', icon: LayoutDashboard },
@@ -92,7 +103,7 @@ export const AppSidebar: React.FC = () => {
             <div className="p-3 bg-[#07111F] rounded border border-[#1E3A5F] text-xs text-center space-y-2">
               <div className="text-[11px] text-[#94A3B8]">No active investigation loaded.</div>
               <button
-                onClick={() => navigate('/app/scans/new')}
+                onClick={() => handleNav('/app/scans/new')}
                 className="w-full py-1.5 px-2 bg-[#172A42] hover:bg-[#1E3A5F] text-[#38BDF8] rounded text-[11px] font-mono-code font-semibold border border-[#38BDF8]/40 transition-colors"
               >
                 + New Assessment
@@ -113,7 +124,7 @@ export const AppSidebar: React.FC = () => {
               return (
                 <button
                   key={item.path}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => handleNav(item.path)}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded text-xs transition-all ${
                     isActive
                       ? 'bg-[#172A42] text-[#A3E635] font-bold border border-[#A3E635]/40 shadow-[0_0_10px_rgba(163,230,53,0.15)]'

@@ -59,10 +59,10 @@ export interface PlanConfig {
 export const PLAN_CATALOGUE: Record<PaymentPlanId, PlanConfig> = {
   pro_monthly: {
     id: 'pro_monthly',
-    name: 'Pro 30-Day Pass',
-    badge: 'Most Popular Launch Pass',
+    name: 'Pro Monthly Membership',
+    badge: '₹499 / Month • Unlocks Document Verification',
     durationDays: 30,
-    durationLabel: '30 Days Access',
+    durationLabel: 'Monthly Membership',
     totalINR: 499,
     amountPaise: 49900,
     baseINR: 422.88,

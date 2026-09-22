@@ -29,7 +29,7 @@ import {
 import { formatISTDateTime } from '../../utils/formatters.ts';
 
 export const OverviewPage: React.FC = () => {
-  const { activeScan, navigate } = useApp();
+  const { activeScan, navigate, user, openAuthModal, showToast } = useApp();
 
   if (!activeScan) {
     return (
@@ -55,7 +55,14 @@ export const OverviewPage: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
               <button
-                onClick={() => navigate('/app/scans/new')}
+                onClick={() => {
+                  if (!user) {
+                    openAuthModal('signin');
+                    showToast('Please sign in or create an account to start an assessment.');
+                    return;
+                  }
+                  navigate('/app/scans/new');
+                }}
                 className="w-full sm:w-auto px-5 py-2.5 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(163,230,53,0.3)] transition-all"
               >
                 <Scan className="w-4 h-4" />
@@ -190,7 +197,14 @@ export const OverviewPage: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/app/scans/new')}
+            onClick={() => {
+              if (!user) {
+                openAuthModal('signin');
+                showToast('Please sign in or create an account to start a new assessment.');
+                return;
+              }
+              navigate('/app/scans/new');
+            }}
             className="px-4 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center gap-1.5 shadow-[0_0_12px_rgba(163,230,53,0.25)] transition-all"
           >
             <Scan className="w-3.5 h-3.5" />

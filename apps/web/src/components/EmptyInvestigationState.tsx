@@ -16,7 +16,7 @@ export const EmptyInvestigationState: React.FC<EmptyInvestigationStateProps> = (
   moduleName,
   description = 'Your account currently has no active investigations loaded. Create a new digital footprint assessment or import a synthetic verification benchmark to analyze.',
 }) => {
-  const { navigate } = useApp();
+  const { navigate, user, openAuthModal, showToast } = useApp();
 
   return (
     <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-lg p-8 sm:p-12 text-center space-y-4 max-w-2xl mx-auto my-8 animate-fadeIn">
@@ -35,7 +35,14 @@ export const EmptyInvestigationState: React.FC<EmptyInvestigationStateProps> = (
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
         <button
-          onClick={() => navigate('/app/scans/new')}
+          onClick={() => {
+            if (!user) {
+              openAuthModal('signin');
+              showToast('Please sign in or create an account to start an assessment.');
+              return;
+            }
+            navigate('/app/scans/new');
+          }}
           className="w-full sm:w-auto px-5 py-2.5 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)] transition-all"
         >
           <Scan className="w-4 h-4" />

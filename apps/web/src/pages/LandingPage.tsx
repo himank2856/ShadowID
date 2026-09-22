@@ -11,7 +11,7 @@ import { Shield, Eye, Users, FileText, Search, ArrowRight, CheckCircle2, Lock, T
 import { ShadowScore } from '../components/ShadowScore.tsx';
 
 export const LandingPage: React.FC = () => {
-  const { navigate, activeScan, t } = useApp();
+  const { navigate, activeScan, t, user, openAuthModal, showToast } = useApp();
 
   return (
     <div className="space-y-16 py-8">
@@ -33,7 +33,14 @@ export const LandingPage: React.FC = () => {
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
           <button
-            onClick={() => navigate('/app/overview')}
+            onClick={() => {
+              if (!user) {
+                openAuthModal('signin');
+                showToast('Please sign in or create an account to access the forensic console.');
+                return;
+              }
+              navigate('/app/overview');
+            }}
             className="w-full sm:w-auto px-6 py-3 rounded text-sm font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(163,230,53,0.3)] transition-all"
           >
             Launch Forensic Console <ArrowRight className="w-4 h-4" />
@@ -78,7 +85,14 @@ export const LandingPage: React.FC = () => {
               </div>
               <div className="pt-2">
                 <button
-                  onClick={() => navigate('/app/scans/new')}
+                  onClick={() => {
+                    if (!user) {
+                      openAuthModal('signin');
+                      showToast('Please sign in or create an account to start an investigation.');
+                      return;
+                    }
+                    navigate('/app/scans/new');
+                  }}
                   className="px-5 py-2 rounded bg-[#A3E635] text-[#07111F] text-xs font-bold hover:bg-[#bef264] inline-flex items-center gap-1.5 transition-all"
                 >
                   Start New Investigation <ArrowRight className="w-3.5 h-3.5" />

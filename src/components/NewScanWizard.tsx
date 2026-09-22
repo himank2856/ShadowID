@@ -10,10 +10,12 @@ import { useApp } from '../context/AppContext.tsx';
 import { ScanJob, ModuleType, Subject, EvidenceNode, EvidenceEdge, DatasetVerificationResult } from '../types.ts';
 import { calculateShadowScore, INDIAN_STATES } from '../data/syntheticDatasets.ts';
 import { datasetVerificationService } from '../services/datasetVerificationService.ts';
-import { Shield, Check, ArrowRight, ArrowLeft, Loader2, Sparkles, AlertCircle, FileText, CheckCircle2, FileCheck2, Database, AlertTriangle, Fingerprint, Search, UserCheck } from 'lucide-react';
+import { Shield, Check, ArrowRight, ArrowLeft, Loader2, Sparkles, AlertCircle, FileText, CheckCircle2, FileCheck2, Database, AlertTriangle, Fingerprint, Search, UserCheck, Lock, CreditCard } from 'lucide-react';
+import { BillingModal } from './BillingModal.tsx';
 
 export const NewScanWizard: React.FC = () => {
-  const { addNewScan, navigate, showToast } = useApp();
+  const { addNewScan, navigate, showToast, user, openAuthModal, billing } = useApp();
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState<boolean>(false);
 
   const [step, setStep] = useState<number>(1);
 
@@ -30,10 +32,12 @@ export const NewScanWizard: React.FC = () => {
   const [retentionDays, setRetentionDays] = useState<number>(30);
   const [consentConfirmed, setConsentConfirmed] = useState<boolean>(true);
 
-  // Step 3: Modules
-  const [selectedModules, setSelectedModules] = useState<ModuleType[]>([
-    'exposure', 'impersonation', 'documents', 'research'
-  ]);
+  // Step 3: Modules (documents requires ₹499/mo Pro membership)
+  const [selectedModules, setSelectedModules] = useState<ModuleType[]>(() =>
+    billing.isPro
+      ? ['exposure', 'impersonation', 'documents', 'research']
+      : ['exposure', 'impersonation', 'research']
+  );
 
   // Project Data Real-time Match State
   const [datasetMatch, setDatasetMatch] = useState<DatasetVerificationResult | null>(null);
@@ -74,12 +78,22 @@ export const NewScanWizard: React.FC = () => {
   const [progressPercent, setProgressPercent] = useState<number>(0);
 
   const toggleModule = (mod: ModuleType) => {
+    if (mod === 'documents' && !billing.isPro) {
+      showToast('Document Verification requires Pro Membership (₹499/month). Please upgrade.');
+      setIsBillingModalOpen(true);
+      return;
+    }
     setSelectedModules((prev) =>
       prev.includes(mod) ? prev.filter((m) => m !== mod) : [...prev, mod]
     );
   };
 
   const startScanJob = () => {
+    if (!user) {
+      openAuthModal('signin');
+      showToast('Please sign in or create an account to execute forensic scans.');
+      return;
+    }
     setIsProcessing(true);
     setProgressPercent(15);
     setProgressStage('Step 1/4: Ingesting consented evidence tokens...');
@@ -310,6 +324,39 @@ export const NewScanWizard: React.FC = () => {
       navigate('/app/overview');
     }, 3800);
   };
+
+  if (!user) {
+    return (
+      <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-xl p-8 max-w-2xl mx-auto text-center shadow-2xl my-8">
+        <div className="w-16 h-16 bg-[#38BDF8]/10 border border-[#38BDF8]/30 rounded-2xl flex items-center justify-center mx-auto mb-5 text-[#38BDF8]">
+          <Lock className="w-8 h-8" />
+        </div>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#172A42] border border-[#1E3A5F] text-[11px] font-mono-code text-[#38BDF8] mb-3">
+          <Shield className="w-3.5 h-3.5 text-[#A3E635]" /> SECURE FORENSIC AUDIT ACCESS
+        </div>
+        <h2 className="text-xl font-display font-bold text-[#F1F5F9] mb-2">
+          Sign In or Sign Up to Run Scans
+        </h2>
+        <p className="text-sm text-[#94A3B8] max-w-md mx-auto mb-6 leading-relaxed">
+          Forensic identity scans correlate active public exposure, avatar hashing, and Indian compliance records under strict DPDP consent. Please authenticate to launch an assessment.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-sm mx-auto">
+          <button
+            onClick={() => openAuthModal('signin')}
+            className="w-full px-6 py-2.5 bg-[#38BDF8] text-[#07111F] font-bold text-xs rounded hover:bg-[#7bd0ff] transition-all shadow-md flex items-center justify-center gap-2"
+          >
+            Sign In to Your Account
+          </button>
+          <button
+            onClick={() => openAuthModal('signup')}
+            className="w-full px-6 py-2.5 bg-[#172A42] border border-[#38BDF8]/40 text-[#38BDF8] font-bold text-xs rounded hover:bg-[#1E3A5F] transition-all flex items-center justify-center gap-2"
+          >
+            Create Free Account
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded p-6 max-w-4xl mx-auto">
@@ -632,6 +679,7 @@ export const NewScanWizard: React.FC = () => {
               },
             ].map((mod) => {
               const active = selectedModules.includes(mod.id);
+              const isProLocked = mod.id === 'documents' && !billing.isPro;
               return (
                 <div
                   key={mod.id}
@@ -639,16 +687,40 @@ export const NewScanWizard: React.FC = () => {
                   className={`p-4 rounded border cursor-pointer transition-all ${
                     active
                       ? 'bg-[#172A42] border-[#38BDF8] text-[#F1F5F9]'
+                      : isProLocked
+                      ? 'bg-[#07111F]/90 border-[#F59E0B]/40 text-[#94A3B8] hover:border-[#F59E0B]'
                       : 'bg-[#07111F] border-[#1E3A5F] text-[#64748B]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-sm text-[#F1F5F9]">{mod.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-[#F1F5F9]">{mod.name}</span>
+                      {isProLocked && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono-code text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/30 px-1.5 py-0.5 rounded">
+                          <Lock className="w-2.5 h-2.5" /> PRO (₹499/mo)
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] font-mono-code text-[#A3E635] bg-[#07111F] px-1.5 py-0.5 rounded border border-[#1E3A5F]">
                       {mod.weight}
                     </span>
                   </div>
                   <p className="text-xs text-[#94A3B8]">{mod.desc}</p>
+                  {isProLocked && (
+                    <div className="mt-2.5 pt-2 border-t border-[#1E3A5F] flex items-center justify-between text-[11px] text-[#F59E0B]">
+                      <span>Document verification requires Pro Membership</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsBillingModalOpen(true);
+                        }}
+                        className="px-2 py-0.5 bg-[#F59E0B] text-[#07111F] font-bold rounded hover:bg-[#fbbf24] transition-all text-[10px] flex items-center gap-1"
+                      >
+                        <CreditCard className="w-2.5 h-2.5" /> ₹499/mo
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -756,6 +828,13 @@ export const NewScanWizard: React.FC = () => {
           ) : null}
         </div>
       )}
+
+      {/* Pro Membership Modal */}
+      <BillingModal
+        isOpen={isBillingModalOpen}
+        onClose={() => setIsBillingModalOpen(false)}
+        initialPlanId="pro_monthly"
+      />
     </div>
   );
 };
