@@ -48,7 +48,44 @@ export const LandingPage: React.FC = () => {
 
         {/* Live Preview Teaser Card */}
         <div className="pt-8 max-w-3xl mx-auto">
-          <ShadowScore scoreData={activeScan.scoreData} />
+          {activeScan ? (
+            <ShadowScore scoreData={activeScan.scoreData} />
+          ) : (
+            <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-lg p-6 shadow-xl text-center space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#07111F] border border-[#38BDF8]/40 text-xs font-mono-code text-[#38BDF8]">
+                <Shield className="w-3.5 h-3.5 text-[#A3E635]" />
+                <span>Deterministic Shadow Score Matrix</span>
+              </div>
+              <div className="max-w-xl mx-auto text-xs text-[#94A3B8]">
+                Deterministic risk breakdown calculated across verified identity tokens, social clone mimicry, and document anomalies under DPDP Act privacy safeguards.
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="p-3 bg-[#07111F] border border-[#1E3A5F] rounded text-left">
+                  <div className="text-[10px] font-mono-code text-[#64748B] uppercase">Exposure Index</div>
+                  <div className="text-sm font-bold text-[#F1F5F9] mt-0.5">35% Weight</div>
+                  <div className="text-[11px] text-[#94A3B8] mt-1">Cross-entity correlations</div>
+                </div>
+                <div className="p-3 bg-[#07111F] border border-[#1E3A5F] rounded text-left">
+                  <div className="text-[10px] font-mono-code text-[#64748B] uppercase">Impersonation Index</div>
+                  <div className="text-sm font-bold text-[#F1F5F9] mt-0.5">25% Weight</div>
+                  <div className="text-[11px] text-[#94A3B8] mt-1">N-gram & Levenshtein mimicry</div>
+                </div>
+                <div className="p-3 bg-[#07111F] border border-[#1E3A5F] rounded text-left">
+                  <div className="text-[10px] font-mono-code text-[#64748B] uppercase">Document Defense</div>
+                  <div className="text-sm font-bold text-[#F1F5F9] mt-0.5">40% Weight</div>
+                  <div className="text-[11px] text-[#94A3B8] mt-1">OCR anomaly & tamper flags</div>
+                </div>
+              </div>
+              <div className="pt-2">
+                <button
+                  onClick={() => navigate('/app/scans/new')}
+                  className="px-5 py-2 rounded bg-[#A3E635] text-[#07111F] text-xs font-bold hover:bg-[#bef264] inline-flex items-center gap-1.5 transition-all"
+                >
+                  Start New Investigation <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

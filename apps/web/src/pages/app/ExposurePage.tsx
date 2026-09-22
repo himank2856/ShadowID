@@ -11,8 +11,14 @@ import { EvidenceGraph } from '../../components/EvidenceGraph.tsx';
 import { Globe, ShieldAlert, CheckCircle2, Phone, Hash, Database, ExternalLink } from 'lucide-react';
 import { formatISTDateTime } from '../../utils/formatters.ts';
 
+import { EmptyInvestigationState } from '../../components/EmptyInvestigationState.tsx';
+
 export const ExposurePage: React.FC = () => {
   const { activeScan } = useApp();
+
+  if (!activeScan) {
+    return <EmptyInvestigationState moduleName="Exposure Intelligence" />;
+  }
 
   return (
     <div className="space-y-6">

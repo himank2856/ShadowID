@@ -10,8 +10,14 @@ import { useApp } from '../../context/AppContext.tsx';
 import { ResearchBridge } from '../../components/ResearchBridge.tsx';
 import { Search, ExternalLink, ShieldCheck, FileCheck, Info } from 'lucide-react';
 
+import { EmptyInvestigationState } from '../../components/EmptyInvestigationState.tsx';
+
 export const ResearchPage: React.FC = () => {
   const { activeScan } = useApp();
+
+  if (!activeScan) {
+    return <EmptyInvestigationState moduleName="Reviewed Deep Search Intelligence" />;
+  }
 
   return (
     <div className="space-y-6">

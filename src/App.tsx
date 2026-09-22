@@ -14,7 +14,6 @@ import { LandingPage } from './pages/LandingPage.tsx';
 import { HowItWorksPage } from './pages/HowItWorksPage.tsx';
 import { PricingPage } from './pages/PricingPage.tsx';
 import { PrivacyTermsPage } from './pages/PrivacyTermsPage.tsx';
-import { DemoPage } from './pages/DemoPage.tsx';
 import { VerificationPage } from './pages/app/VerificationPage.tsx';
 import { OverviewPage } from './pages/app/OverviewPage.tsx';
 import { NewScanWizard } from './components/NewScanWizard.tsx';

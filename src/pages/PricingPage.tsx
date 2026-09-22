@@ -9,10 +9,12 @@ import { useApp } from '../context/AppContext.tsx';
 import { formatINR, paiseToINR } from '../utils/formatters.ts';
 import { Check, Shield, Zap, Sparkles } from 'lucide-react';
 import { BillingModal } from '../components/BillingModal.tsx';
+import { PaymentPlanId } from '../types.ts';
 
 export const PricingPage: React.FC = () => {
   const { billing } = useApp();
   const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+  const [selectedPlanForModal, setSelectedPlanForModal] = useState<PaymentPlanId>('pro_monthly');
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-10">
@@ -114,10 +116,13 @@ export const PricingPage: React.FC = () => {
 
           <div className="pt-6">
             <button
-              onClick={() => setIsBillingModalOpen(true)}
+              onClick={() => {
+                setSelectedPlanForModal('pro_monthly');
+                setIsBillingModalOpen(true);
+              }}
               className="w-full py-2.5 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] transition-all shadow-[0_0_15px_rgba(163,230,53,0.3)]"
             >
-              {billing.isPro ? 'Pro Pass Active' : 'Authorize ₹499 (Test Mode)'}
+              {billing.isPro ? 'Pro Pass Active • Manage' : 'Authorize ₹499 (Test Mode)'}
             </button>
           </div>
         </div>
@@ -126,10 +131,10 @@ export const PricingPage: React.FC = () => {
         <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded p-6 flex flex-col justify-between">
           <div>
             <span className="text-xs font-mono-code text-[#F59E0B] uppercase">Institutional</span>
-            <h3 className="text-xl font-display font-bold text-[#F1F5F9] mt-1">Enterprise</h3>
+            <h3 className="text-xl font-display font-bold text-[#F1F5F9] mt-1">Enterprise Token</h3>
             <div className="mt-4 mb-4">
               <span className="text-3xl font-display font-black text-[#F1F5F9]">
-                Custom
+                {formatINR(14999)}
               </span>
               <span className="text-xs text-[#94A3B8] ml-1">/ mandate</span>
             </div>
@@ -155,16 +160,23 @@ export const PricingPage: React.FC = () => {
 
           <div className="pt-6">
             <button
-              onClick={() => alert('For custom Enterprise deployments, reach out to Team GIGABYTE (Anshul, Tanishq, Himank) at Build With Bharat 3.0.')}
+              onClick={() => {
+                setSelectedPlanForModal('enterprise_token');
+                setIsBillingModalOpen(true);
+              }}
               className="w-full py-2 rounded text-xs font-semibold bg-[#172A42] text-[#38BDF8] border border-[#38BDF8]/40 hover:bg-[#1E3A5F]"
             >
-              Contact Team GIGABYTE
+              Order Institutional Pass (₹14,999)
             </button>
           </div>
         </div>
       </div>
 
-      <BillingModal isOpen={isBillingModalOpen} onClose={() => setIsBillingModalOpen(false)} />
+      <BillingModal
+        isOpen={isBillingModalOpen}
+        onClose={() => setIsBillingModalOpen(false)}
+        initialPlanId={selectedPlanForModal}
+      />
     </div>
   );
 };

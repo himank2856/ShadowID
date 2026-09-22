@@ -9,9 +9,14 @@ import React from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { FileCheck, Download, Printer, Shield, CheckCircle2, Hash, AlertTriangle } from 'lucide-react';
 import { formatISTDateTime } from '../../utils/formatters.ts';
+import { EmptyInvestigationState } from '../../components/EmptyInvestigationState.tsx';
 
 export const ReportsPage: React.FC = () => {
   const { activeScan, showToast } = useApp();
+
+  if (!activeScan) {
+    return <EmptyInvestigationState moduleName="Forensic Dossier & Reports" />;
+  }
 
   const handlePrint = () => {
     window.print();

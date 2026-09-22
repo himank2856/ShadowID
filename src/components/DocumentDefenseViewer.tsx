@@ -12,9 +12,10 @@ import { FileText, Eye, AlertOctagon, CheckCircle2, ShieldAlert, Cpu, ZoomIn } f
 
 interface DocumentDefenseViewerProps {
   data: DocumentAnalysisData;
+  imageUrl?: string;
 }
 
-export const DocumentDefenseViewer: React.FC<DocumentDefenseViewerProps> = ({ data }) => {
+export const DocumentDefenseViewer: React.FC<DocumentDefenseViewerProps> = ({ data, imageUrl }) => {
   const { updateDocumentReview } = useApp();
   const [selectedBox, setSelectedBox] = useState<DocumentOcrBox | null>(data.boxes[0] || null);
   const [unmaskSensitive, setUnmaskSensitive] = useState<boolean>(false);
@@ -24,10 +25,12 @@ export const DocumentDefenseViewer: React.FC<DocumentDefenseViewerProps> = ({ da
   const getVerdictStyle = () => {
     switch (data.verdict) {
       case 'Requires review':
+      case 'Requires Urgent Forensic Review (Anomalies Flagged)':
         return 'bg-[#EF4444]/15 text-[#EF4444] border-[#EF4444]';
       case 'Insufficient image quality':
+      case 'Advisory: Compliance Review Recommended':
         return 'bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]';
-      case 'No configured inconsistencies found':
+      default:
         return 'bg-[#A3E635]/15 text-[#A3E635] border-[#A3E635]';
     }
   };
@@ -41,7 +44,7 @@ export const DocumentDefenseViewer: React.FC<DocumentDefenseViewerProps> = ({ da
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#172A42]">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <FileText className="w-4 h-4 text-[#F59E0B]" />
             <h3 className="text-base font-display font-bold text-[#F1F5F9]">
               Document Defense OCR & Geometry Inspector
@@ -51,7 +54,7 @@ export const DocumentDefenseViewer: React.FC<DocumentDefenseViewerProps> = ({ da
             </span>
           </div>
           <p className="text-xs text-[#94A3B8] mt-0.5">
-            Tesseract eng/hin + OpenCV morphological baseline validation. (Category: {data.documentCategory})
+            {data.ocrEngine} • (Category: {data.documentCategory})
           </p>
         </div>
 
@@ -76,62 +79,99 @@ export const DocumentDefenseViewer: React.FC<DocumentDefenseViewerProps> = ({ da
           </div>
 
           <div className="absolute top-2 right-2 z-10 text-[10px] font-mono-code text-[#94A3B8] bg-[#0F1D2E]/90 px-2 py-0.5 rounded border border-[#1E3A5F]">
-            Quality: {data.qualityScore}%
+            Confidence: {data.qualityScore}%
           </div>
 
-          {/* Synthetic ID Card Mock Surface */}
-          <div className="w-full max-w-md aspect-[1.58/1] bg-gradient-to-br from-[#121c2a] via-[#0e1824] to-[#07111f] rounded-lg border-2 border-[#1E3A5F] relative p-4 shadow-xl overflow-hidden">
-            {/* Hologram / Guilloche Background Simulation */}
-            <div className="absolute inset-0 opacity-10 bg-tactical-grid pointer-events-none" />
-            
-            {/* Card Header */}
-            <div className="flex justify-between items-center border-b border-[#1E3A5F]/60 pb-2">
-              <div className="text-[11px] font-bold font-display tracking-wider text-[#F1F5F9] uppercase">
-                {data.documentCategory === 'Aadhaar' && 'Government of India / भारत सरकार'}
-                {data.documentCategory === 'PAN' && 'Income Tax Department / आयकर विभाग'}
-                {data.documentCategory === 'Passport' && 'Passport / पासपोर्ट — Republic of India'}
-                {data.documentCategory === 'Generic ID' && 'Identification Credential'}
-              </div>
-              <span className="text-[9px] font-mono-code text-[#38BDF8] border border-[#38BDF8]/40 px-1 py-0.2 rounded">
-                SAMPLE
-              </span>
+          {/* Real Upload Surface OR Synthetic ID Card Surface */}
+          {imageUrl ? (
+            <div className="w-full max-w-lg aspect-[1.58/1] bg-[#050D17] rounded-lg border-2 border-[#1E3A5F] relative shadow-xl overflow-hidden flex items-center justify-center">
+              <img
+                src={imageUrl}
+                alt="Uploaded Document"
+                className="w-full h-full object-contain pointer-events-none select-none"
+              />
+              {/* Bounding Boxes Overlaid onto Real Image */}
+              {data.boxes.map((box) => {
+                const isSelected = selectedBox?.id === box.id;
+                return (
+                  <div
+                    key={box.id}
+                    onClick={() => setSelectedBox(box)}
+                    style={{
+                      top: `${box.y}%`,
+                      left: `${box.x}%`,
+                      width: `${box.width}%`,
+                      height: `${box.height}%`,
+                    }}
+                    className={`absolute cursor-pointer transition-all rounded-sm flex items-center px-1 border text-[10px] font-mono-code overflow-hidden ${
+                      box.isAnomaly
+                        ? 'bg-[#EF4444]/35 border-[#EF4444] text-[#EF4444] animate-pulse ring-2 ring-[#EF4444]/50'
+                        : isSelected
+                        ? 'bg-[#38BDF8]/30 border-[#38BDF8] text-[#38BDF8] shadow-[0_0_10px_rgba(56,189,248,0.5)] ring-1 ring-[#38BDF8]'
+                        : 'bg-[#A3E635]/20 border-[#A3E635]/80 text-[#F1F5F9] hover:bg-[#A3E635]/30'
+                    }`}
+                  >
+                    <span className="truncate bg-black/60 px-0.5 rounded text-[9px]">
+                      {unmaskSensitive ? box.value : box.maskedValue}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* Bounding Boxes Overlaid */}
-            {data.boxes.map((box) => {
-              const isSelected = selectedBox?.id === box.id;
-              return (
-                <div
-                  key={box.id}
-                  onClick={() => setSelectedBox(box)}
-                  style={{
-                    top: `${box.y}%`,
-                    left: `${box.x}%`,
-                    width: `${box.width}%`,
-                    height: `${box.height}%`,
-                  }}
-                  className={`absolute cursor-pointer transition-all rounded-sm flex items-center px-1.5 border text-[10px] font-mono-code overflow-hidden ${
-                    box.isAnomaly
-                      ? 'bg-[#EF4444]/25 border-[#EF4444] text-[#EF4444] animate-pulse'
-                      : isSelected
-                      ? 'bg-[#38BDF8]/20 border-[#38BDF8] text-[#38BDF8] shadow-[0_0_8px_rgba(56,189,248,0.3)]'
-                      : 'bg-[#A3E635]/10 border-[#A3E635]/60 text-[#A3E635] hover:border-[#A3E635]'
-                  }`}
-                >
-                  <span className="truncate">
-                    {unmaskSensitive ? box.value : box.maskedValue}
-                  </span>
+          ) : (
+            <div className="w-full max-w-md aspect-[1.58/1] bg-gradient-to-br from-[#121c2a] via-[#0e1824] to-[#07111f] rounded-lg border-2 border-[#1E3A5F] relative p-4 shadow-xl overflow-hidden">
+              {/* Hologram / Guilloche Background Simulation */}
+              <div className="absolute inset-0 opacity-10 bg-tactical-grid pointer-events-none" />
+              
+              {/* Card Header */}
+              <div className="flex justify-between items-center border-b border-[#1E3A5F]/60 pb-2">
+                <div className="text-[11px] font-bold font-display tracking-wider text-[#F1F5F9] uppercase">
+                  {data.documentCategory === 'Aadhaar' && 'Government of India / भारत सरकार'}
+                  {data.documentCategory === 'PAN' && 'Income Tax Department / आयकर विभाग'}
+                  {data.documentCategory === 'Passport' && 'Passport / पासपोर्ट — Republic of India'}
+                  {data.documentCategory === 'Generic ID' && 'Identification Credential'}
                 </div>
-              );
-            })}
+                <span className="text-[9px] font-mono-code text-[#38BDF8] border border-[#38BDF8]/40 px-1 py-0.2 rounded">
+                  FIXTURE
+                </span>
+              </div>
 
-            {/* Specimen watermark */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-              <span className="text-3xl font-display font-black text-white/5 uppercase rotate-[-25deg] tracking-widest">
-                SYNTHETIC SPECIMEN
-              </span>
+              {/* Bounding Boxes Overlaid */}
+              {data.boxes.map((box) => {
+                const isSelected = selectedBox?.id === box.id;
+                return (
+                  <div
+                    key={box.id}
+                    onClick={() => setSelectedBox(box)}
+                    style={{
+                      top: `${box.y}%`,
+                      left: `${box.x}%`,
+                      width: `${box.width}%`,
+                      height: `${box.height}%`,
+                    }}
+                    className={`absolute cursor-pointer transition-all rounded-sm flex items-center px-1.5 border text-[10px] font-mono-code overflow-hidden ${
+                      box.isAnomaly
+                        ? 'bg-[#EF4444]/25 border-[#EF4444] text-[#EF4444] animate-pulse'
+                        : isSelected
+                        ? 'bg-[#38BDF8]/20 border-[#38BDF8] text-[#38BDF8] shadow-[0_0_8px_rgba(56,189,248,0.3)]'
+                        : 'bg-[#A3E635]/10 border-[#A3E635]/60 text-[#A3E635] hover:border-[#A3E635]'
+                    }`}
+                  >
+                    <span className="truncate">
+                      {unmaskSensitive ? box.value : box.maskedValue}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Specimen watermark */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                <span className="text-3xl font-display font-black text-white/5 uppercase rotate-[-25deg] tracking-widest">
+                  SYNTHETIC SPECIMEN
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mt-3 text-[11px] text-[#64748B] flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-[#38BDF8]" />

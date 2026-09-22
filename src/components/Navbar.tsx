@@ -20,10 +20,12 @@ import {
   CheckCircle2,
   ChevronDown,
   FileCheck2,
+  Database,
 } from 'lucide-react';
 import { Role } from '../types.ts';
 import { BillingModal } from './BillingModal.tsx';
 import { AuthModal } from './AuthModal.tsx';
+import { supabaseService } from '../services/supabaseService.ts';
 
 export const Navbar: React.FC = () => {
   const {
@@ -46,6 +48,8 @@ export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
+  const supabaseConfig = supabaseService.getConfig();
+
   return (
     <>
       {/* Enterprise Security & DPDP Compliance Status Bar */}
@@ -57,6 +61,16 @@ export const Navbar: React.FC = () => {
           <span className="text-[#38BDF8] hidden sm:inline">DPDP Act 2023 Compliant Repository</span>
         </div>
         <div className="hidden sm:flex items-center gap-3 text-[#94A3B8]">
+          <button
+            onClick={() => navigate('/app/settings')}
+            className="flex items-center gap-1.5 text-[#38BDF8] hover:text-[#A3E635] transition-colors cursor-pointer bg-[#172A42]/60 px-2 py-0.5 rounded border border-[#1E3A5F]"
+            title="Supabase Cloud Database Settings"
+          >
+            <Database className="w-3 h-3 text-[#38BDF8]" />
+            <span>Supabase: <strong className="text-[#A3E635]">{supabaseConfig.accountName}</strong></span>
+            <span className={`w-1.5 h-1.5 rounded-full ${supabaseConfig.isConnected ? 'bg-[#A3E635]' : 'bg-[#38BDF8]'} inline-block animate-pulse`}></span>
+          </button>
+          <span className="text-[#64748B]">•</span>
           <span>Chitkara Cyber Forensics Cell</span>
           <span className="text-[#64748B]">•</span>
           <span className="text-[#A3E635] flex items-center gap-1">
@@ -192,6 +206,12 @@ export const Navbar: React.FC = () => {
                         <span className="text-[#64748B]">Pro Status:</span>
                         <span className={user.isPro ? 'text-[#A3E635]' : 'text-[#F59E0B]'}>
                           {user.isPro ? 'Pro Active' : 'Free Tier'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Cloud DB:</span>
+                        <span className="text-[#38BDF8] flex items-center gap-1">
+                          <Database className="w-3 h-3 text-[#A3E635]" /> {supabaseConfig.accountName}
                         </span>
                       </div>
                     </div>

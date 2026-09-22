@@ -5,10 +5,11 @@
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ScanJob, Role, Language, Theme, ActionItem, UserAccount } from '../types.ts';
+import { ScanJob, Role, Language, Theme, ActionItem, UserAccount, PaymentReceipt } from '../types.ts';
 import { SYNTHETIC_CASES, calculateShadowScore } from '../data/syntheticDatasets.ts';
 import { TRANSLATIONS } from '../utils/formatters.ts';
 import { accountDatabase } from '../services/accountDatabase.ts';
+import { paymentProtocolService } from '../services/paymentProtocolService.ts';
 
 interface AppContextType {
   currentRoute: string;
@@ -30,7 +31,8 @@ interface AppContextType {
   scans: Record<string, ScanJob>;
   activeScanId: string;
   setActiveScanId: (id: string) => void;
-  activeScan: ScanJob;
+  activeScan: ScanJob | null;
+  importVerificationBenchmark: (benchmarkJob: ScanJob) => void;
   updateActionStatus: (actionId: string, status: 'pending' | 'in-progress' | 'resolved') => void;
   updateClaimStatus: (claimId: string, status: 'accepted' | 'rejected') => void;
   updateDocumentReview: (isVerified: boolean, notes: string) => void;
@@ -39,7 +41,8 @@ interface AppContextType {
   billing: {
     isPro: boolean;
     passExpiryDate?: string;
-    upgradeToPro: () => void;
+    upgradeToPro: (receipt?: PaymentReceipt) => void;
+    latestReceipt: PaymentReceipt | null;
   };
   t: typeof TRANSLATIONS['en'];
   toastMessage: string | null;
@@ -58,13 +61,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [theme, setTheme] = useState<Theme>('dark');
   const [scans, setScans] = useState<Record<string, ScanJob>>(() => {
     if (user) {
-      const userScans = accountDatabase.getUserScans(user.id);
-      if (Object.keys(userScans).length > 0) return userScans;
+      return accountDatabase.getUserScans(user.id);
     }
-    return SYNTHETIC_CASES;
+    return {};
   });
-  const [activeScanId, setActiveScanId] = useState<string>('arun_s');
+  const [activeScanId, setActiveScanId] = useState<string>(() => {
+    if (user) {
+      const userScans = accountDatabase.getUserScans(user.id);
+      const keys = Object.keys(userScans);
+      return keys.length > 0 ? keys[0] : '';
+    }
+    return '';
+  });
   const [isPro, setIsPro] = useState<boolean>(() => user?.isPro || false);
+  const [latestReceipt, setLatestReceipt] = useState<PaymentReceipt | null>(() => paymentProtocolService.getReceipts()[0] || null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const openAuthModal = (tab: 'signin' | 'signup' = 'signin') => {
@@ -82,15 +92,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsPro(authenticatedUser.isPro);
     accountDatabase.setActiveSession(authenticatedUser);
 
-    // Load scans for this user or initialize with baseline
+    // Load scans for this user only
     const userScans = accountDatabase.getUserScans(authenticatedUser.id);
-    if (Object.keys(userScans).length > 0) {
-      setScans(userScans);
-      setActiveScanId(Object.keys(userScans)[0]);
-    } else {
-      setScans(SYNTHETIC_CASES);
-      setActiveScanId('arun_s');
-    }
+    setScans(userScans);
+    const keys = Object.keys(userScans);
+    setActiveScanId(keys.length > 0 ? keys[0] : '');
   };
 
   const logout = () => {
@@ -98,6 +104,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(null);
     setRole('analyst');
     setIsPro(false);
+    setScans({});
+    setActiveScanId('');
     showToast('Signed out of forensic workspace.');
     navigate('/');
   };
@@ -118,7 +126,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const activeScan: ScanJob = scans[activeScanId] || scans.arun_s;
+  const activeScan: ScanJob | null = (activeScanId && scans[activeScanId]) ? scans[activeScanId] : (Object.values(scans)[0] ?? null);
+
+  const importVerificationBenchmark = (benchmarkJob: ScanJob) => {
+    setScans((prev) => ({
+      [benchmarkJob.id]: benchmarkJob,
+      ...prev,
+    }));
+    setActiveScanId(benchmarkJob.id);
+    if (user) {
+      accountDatabase.saveUserScan(user.id, benchmarkJob);
+    }
+    showToast(`Benchmark dataset imported into active workspace.`);
+    navigate('/app/overview');
+  };
 
   const updateActionStatus = (actionId: string, status: 'pending' | 'in-progress' | 'resolved') => {
     setScans((prev) => {
@@ -208,14 +229,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('New assessment scan queued and initialized.');
   };
 
-  const upgradeToPro = () => {
+  const upgradeToPro = (receipt?: PaymentReceipt) => {
     setIsPro(true);
+    if (receipt) {
+      setLatestReceipt(receipt);
+    }
+    const expiry = receipt?.validUntilIST || '21 Oct 2026, 23:59 IST';
     if (user) {
       user.isPro = true;
-      user.passExpiryDate = '21 Oct 2026, 23:59 IST';
+      user.passExpiryDate = expiry;
       accountDatabase.setActiveSession(user);
     }
-    showToast('Razorpay Test Mode: ₹499 (49900 paise) authorized. 30-Day Pro Pass active!');
+    const planTitle = receipt?.planName || 'Pro 30-Day Pass';
+    showToast(`Payment Confirmed! ${planTitle} active until ${expiry}. Tax Invoice generated.`);
   };
 
   const t = TRANSLATIONS[language];
@@ -243,6 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeScanId,
         setActiveScanId,
         activeScan,
+        importVerificationBenchmark,
         updateActionStatus,
         updateClaimStatus,
         updateDocumentReview,
@@ -250,8 +277,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addNewScan,
         billing: {
           isPro,
-          passExpiryDate: isPro ? '21 Oct 2026, 23:59 IST' : undefined,
+          passExpiryDate: isPro ? (user?.passExpiryDate || '21 Oct 2026, 23:59 IST') : undefined,
           upgradeToPro,
+          latestReceipt,
         },
         t,
         toastMessage,

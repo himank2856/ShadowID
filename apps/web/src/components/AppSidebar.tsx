@@ -20,14 +20,26 @@ import {
   UserCheck,
   Shield,
   Layers,
+  FileCheck2,
 } from 'lucide-react';
 
 export const AppSidebar: React.FC = () => {
-  const { currentRoute, navigate, scans, activeScanId, setActiveScanId, activeScan, role, t } = useApp();
+  const {
+    currentRoute,
+    navigate,
+    scans,
+    activeScanId,
+    setActiveScanId,
+    activeScan,
+    user,
+    role,
+    t,
+  } = useApp();
 
   const navItems = [
     { label: t.navOverview, path: '/app/overview', icon: LayoutDashboard },
     { label: t.navNewScan, path: '/app/scans/new', icon: Scan },
+    { label: 'Verification Lab', path: '/app/verification', icon: FileCheck2 },
     { label: t.navExposure, path: '/app/exposure', icon: Globe },
     { label: t.navImpersonation, path: '/app/impersonation', icon: Users },
     { label: t.navDocuments, path: '/app/documents', icon: FileText },
@@ -44,35 +56,49 @@ export const AppSidebar: React.FC = () => {
         <div>
           <label className="block text-[10px] font-mono-code uppercase text-[#94A3B8] mb-1.5 flex items-center justify-between">
             <span>Target Investigation</span>
-            <span className="text-[#A3E635]">Indian Preset</span>
+            <span className="text-[#38BDF8]">{Object.keys(scans).length} Active</span>
           </label>
-          <select
-            value={activeScanId}
-            onChange={(e) => setActiveScanId(e.target.value)}
-            className="w-full bg-[#07111F] border border-[#1E3A5F] text-[#F1F5F9] rounded p-2 text-xs font-medium focus:outline-none focus:border-[#38BDF8]"
-          >
-            {Object.entries(scans).map(([key, scan]) => (
-              <option key={key} value={key} className="bg-[#07111F]">
-                {scan.subject.name} ({scan.subject.city})
-              </option>
-            ))}
-          </select>
+          {Object.keys(scans).length > 0 && activeScan ? (
+            <>
+              <select
+                value={activeScanId}
+                onChange={(e) => setActiveScanId(e.target.value)}
+                className="w-full bg-[#07111F] border border-[#1E3A5F] text-[#F1F5F9] rounded p-2 text-xs font-medium focus:outline-none focus:border-[#38BDF8]"
+              >
+                {Object.entries(scans).map(([key, scan]) => (
+                  <option key={key} value={key} className="bg-[#07111F]">
+                    {scan.subject.name} ({scan.subject.city})
+                  </option>
+                ))}
+              </select>
 
-          {/* Mini active subject info pill */}
-          <div className="mt-2 p-2 bg-[#07111F] rounded border border-[#1E3A5F] text-[11px] space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Territory:</span>
-              <span className="text-[#CBD5E1] font-mono-code">{activeScan.subject.city}, {activeScan.subject.state}</span>
+              {/* Mini active subject info pill */}
+              <div className="mt-2 p-2 bg-[#07111F] rounded border border-[#1E3A5F] text-[11px] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#94A3B8]">Territory:</span>
+                  <span className="text-[#CBD5E1] font-mono-code">{activeScan.subject.city}, {activeScan.subject.state}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#94A3B8]">Handle:</span>
+                  <span className="text-[#38BDF8] font-mono-code">{activeScan.subject.primaryHandle || '—'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#94A3B8]">Retention TTL:</span>
+                  <span className="text-[#A3E635] font-mono-code">{activeScan.consent.retentionDays} Days</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="p-3 bg-[#07111F] rounded border border-[#1E3A5F] text-xs text-center space-y-2">
+              <div className="text-[11px] text-[#94A3B8]">No active investigation loaded.</div>
+              <button
+                onClick={() => navigate('/app/scans/new')}
+                className="w-full py-1.5 px-2 bg-[#172A42] hover:bg-[#1E3A5F] text-[#38BDF8] rounded text-[11px] font-mono-code font-semibold border border-[#38BDF8]/40 transition-colors"
+              >
+                + New Assessment
+              </button>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Handle:</span>
-              <span className="text-[#38BDF8] font-mono-code">{activeScan.subject.primaryHandle || '—'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Retention TTL:</span>
-              <span className="text-[#A3E635] font-mono-code">{activeScan.consent.retentionDays} Days</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Navigation Section */}
@@ -109,16 +135,20 @@ export const AppSidebar: React.FC = () => {
       {/* Workspace Footer Info */}
       <div className="pt-4 border-t border-[#172A42] text-[11px] font-mono-code text-[#64748B] space-y-1">
         <div className="flex items-center justify-between">
-          <span>Active Role:</span>
-          <span className="text-[#38BDF8] uppercase font-bold">{role}</span>
+          <span>Analyst:</span>
+          <span className="text-[#F1F5F9] font-medium truncate max-w-[130px]">
+            {user ? user.fullName : 'Guest Investigator'}
+          </span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Workspace:</span>
-          <span className="text-[#F1F5F9]">Team GIGABYTE</span>
+          <span>Auth Status:</span>
+          <span className="text-[#A3E635] font-bold">
+            {user?.isVerified ? 'DPDP Verified' : 'Unauthenticated'}
+          </span>
         </div>
         <div className="flex items-center justify-between">
-          <span>Region:</span>
-          <span className="text-[#A3E635]">in-south-1 (Mumbai)</span>
+          <span>Jurisdiction:</span>
+          <span className="text-[#38BDF8]">IN (Bharat 3.0)</span>
         </div>
       </div>
     </aside>

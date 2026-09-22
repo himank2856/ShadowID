@@ -56,35 +56,49 @@ export const AppSidebar: React.FC = () => {
         <div>
           <label className="block text-[10px] font-mono-code uppercase text-[#94A3B8] mb-1.5 flex items-center justify-between">
             <span>Target Investigation</span>
-            <span className="text-[#A3E635]">Active Case</span>
+            <span className="text-[#38BDF8]">{Object.keys(scans).length} Active</span>
           </label>
-          <select
-            value={activeScanId}
-            onChange={(e) => setActiveScanId(e.target.value)}
-            className="w-full bg-[#07111F] border border-[#1E3A5F] text-[#F1F5F9] rounded p-2 text-xs font-medium focus:outline-none focus:border-[#38BDF8]"
-          >
-            {Object.entries(scans).map(([key, scan]) => (
-              <option key={key} value={key} className="bg-[#07111F]">
-                {scan.subject.name} ({scan.subject.city})
-              </option>
-            ))}
-          </select>
+          {Object.keys(scans).length > 0 && activeScan ? (
+            <>
+              <select
+                value={activeScanId}
+                onChange={(e) => setActiveScanId(e.target.value)}
+                className="w-full bg-[#07111F] border border-[#1E3A5F] text-[#F1F5F9] rounded p-2 text-xs font-medium focus:outline-none focus:border-[#38BDF8]"
+              >
+                {Object.entries(scans).map(([key, scan]) => (
+                  <option key={key} value={key} className="bg-[#07111F]">
+                    {scan.subject.name} ({scan.subject.city})
+                  </option>
+                ))}
+              </select>
 
-          {/* Mini active subject info pill */}
-          <div className="mt-2 p-2 bg-[#07111F] rounded border border-[#1E3A5F] text-[11px] space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Territory:</span>
-              <span className="text-[#CBD5E1] font-mono-code">{activeScan.subject.city}, {activeScan.subject.state}</span>
+              {/* Mini active subject info pill */}
+              <div className="mt-2 p-2 bg-[#07111F] rounded border border-[#1E3A5F] text-[11px] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#94A3B8]">Territory:</span>
+                  <span className="text-[#CBD5E1] font-mono-code">{activeScan.subject.city}, {activeScan.subject.state}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#94A3B8]">Handle:</span>
+                  <span className="text-[#38BDF8] font-mono-code">{activeScan.subject.primaryHandle || '—'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#94A3B8]">Retention TTL:</span>
+                  <span className="text-[#A3E635] font-mono-code">{activeScan.consent.retentionDays} Days</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="p-3 bg-[#07111F] rounded border border-[#1E3A5F] text-xs text-center space-y-2">
+              <div className="text-[11px] text-[#94A3B8]">No active investigation loaded.</div>
+              <button
+                onClick={() => navigate('/app/scans/new')}
+                className="w-full py-1.5 px-2 bg-[#172A42] hover:bg-[#1E3A5F] text-[#38BDF8] rounded text-[11px] font-mono-code font-semibold border border-[#38BDF8]/40 transition-colors"
+              >
+                + New Assessment
+              </button>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Handle:</span>
-              <span className="text-[#38BDF8] font-mono-code">{activeScan.subject.primaryHandle || '—'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#94A3B8]">Retention TTL:</span>
-              <span className="text-[#A3E635] font-mono-code">{activeScan.consent.retentionDays} Days</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Navigation Section */}

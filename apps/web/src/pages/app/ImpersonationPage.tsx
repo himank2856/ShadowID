@@ -10,8 +10,14 @@ import { useApp } from '../../context/AppContext.tsx';
 import { ProfileComparison } from '../../components/ProfileComparison.tsx';
 import { Users, AlertTriangle, ShieldCheck, Mail, Flag, Copy } from 'lucide-react';
 
+import { EmptyInvestigationState } from '../../components/EmptyInvestigationState.tsx';
+
 export const ImpersonationPage: React.FC = () => {
   const { activeScan, showToast } = useApp();
+
+  if (!activeScan) {
+    return <EmptyInvestigationState moduleName="Impersonation Intelligence" />;
+  }
 
   const handleCopyNotice = () => {
     const text = `FORMAL PLATFORM IMPERSONATION NOTICE

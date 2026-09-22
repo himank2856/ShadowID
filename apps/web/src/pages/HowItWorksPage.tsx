@@ -105,10 +105,10 @@ export const HowItWorksPage: React.FC = () => {
 
       <div className="text-center pt-4">
         <button
-          onClick={() => navigate('/demo')}
+          onClick={() => navigate('/app/verification')}
           className="px-6 py-2.5 bg-[#A3E635] text-[#07111F] font-bold text-xs rounded hover:bg-[#bef264] transition-all inline-flex items-center gap-2"
         >
-          Test with Repeatable Indian Cases <ArrowRight className="w-4 h-4" />
+          Explore Verification Benchmark Lab <ArrowRight className="w-4 h-4" />
         </button>
       </div>
     </div>

@@ -3,7 +3,7 @@
  * Team GIGABYTE (Anshul, Tanishq, Himank) - Build With Bharat 3.0
  */
 
-import {
+import type {
   ShadowScoreCalculation,
   ProfileComparisonData,
   DocumentAnalysisData,
@@ -144,3 +144,6 @@ export const apiClient = {
     body: JSON.stringify({ scanData }),
   }),
 };
+
+export const api = apiClient;
+

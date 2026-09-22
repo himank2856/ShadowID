@@ -14,7 +14,7 @@ import { LandingPage } from './pages/LandingPage.tsx';
 import { HowItWorksPage } from './pages/HowItWorksPage.tsx';
 import { PricingPage } from './pages/PricingPage.tsx';
 import { PrivacyTermsPage } from './pages/PrivacyTermsPage.tsx';
-import { DemoPage } from './pages/DemoPage.tsx';
+import { VerificationPage } from './pages/app/VerificationPage.tsx';
 import { OverviewPage } from './pages/app/OverviewPage.tsx';
 import { NewScanWizard } from './components/NewScanWizard.tsx';
 import { ExposurePage } from './pages/app/ExposurePage.tsx';
@@ -27,7 +27,7 @@ import { SettingsPage } from './pages/app/SettingsPage.tsx';
 import { Shield, ExternalLink, Heart } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { currentRoute, navigate, toastMessage, theme } = useApp();
+  const { currentRoute, navigate, toastMessage, theme, isAuthenticated, openAuthModal } = useApp();
 
   const isAppRoute = currentRoute.startsWith('/app');
 
@@ -43,7 +43,9 @@ const AppContent: React.FC = () => {
       case '/terms':
         return <PrivacyTermsPage />;
       case '/demo':
-        return <DemoPage />;
+      case '/verification':
+      case '/app/verification':
+        return <VerificationPage />;
       case '/app/overview':
         return <OverviewPage />;
       case '/app/scans/new':

@@ -6,25 +6,76 @@
 
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.tsx';
-import { Shield, Globe, User, CreditCard, Sparkles, Menu, X, ExternalLink } from 'lucide-react';
+import {
+  Shield,
+  Globe,
+  User,
+  CreditCard,
+  Sparkles,
+  Menu,
+  X,
+  ExternalLink,
+  Lock,
+  LogOut,
+  CheckCircle2,
+  ChevronDown,
+  FileCheck2,
+  Database,
+} from 'lucide-react';
 import { Role } from '../types.ts';
 import { BillingModal } from './BillingModal.tsx';
+import { AuthModal } from './AuthModal.tsx';
+import { supabaseService } from '../services/supabaseService.ts';
 
 export const Navbar: React.FC = () => {
-  const { currentRoute, navigate, role, setRole, language, setLanguage, billing, t } = useApp();
+  const {
+    currentRoute,
+    navigate,
+    user,
+    isAuthenticated,
+    openAuthModal,
+    isAuthModalOpen,
+    closeAuthModal,
+    authModalTab,
+    logout,
+    language,
+    setLanguage,
+    billing,
+    t,
+  } = useApp();
+
   const [isBillingOpen, setIsBillingOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  const supabaseConfig = supabaseService.getConfig();
 
   return (
     <>
-      {/* Synthetic Demo Warning Banner */}
-      <div className="bg-[#121c2a] border-b border-[#1E3A5F] px-4 py-1 text-[11px] font-mono-code text-[#A3E635] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#A3E635] animate-pulse" />
-          <span>{t.syntheticNotice}</span>
+      {/* Enterprise Security & DPDP Compliance Status Bar */}
+      <div className="bg-[#0b131e] border-b border-[#1E3A5F] px-4 py-1 text-[11px] font-mono-code text-[#CBD5E1] flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[#A3E635]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#A3E635] animate-pulse" />
+          <span className="font-medium">ShadowID Enterprise Forensic Suite</span>
+          <span className="text-[#64748B] hidden sm:inline">•</span>
+          <span className="text-[#38BDF8] hidden sm:inline">DPDP Act 2023 Compliant Repository</span>
         </div>
-        <div className="hidden sm:block text-[#94A3B8]">
-          Team GIGABYTE: Anshul, Tanishq, Himank | Build With Bharat 3.0 (Chitkara Univ, HP)
+        <div className="hidden sm:flex items-center gap-3 text-[#94A3B8]">
+          <button
+            onClick={() => navigate('/app/settings')}
+            className="flex items-center gap-1.5 text-[#38BDF8] hover:text-[#A3E635] transition-colors cursor-pointer bg-[#172A42]/60 px-2 py-0.5 rounded border border-[#1E3A5F]"
+            title="Supabase Cloud Database Settings"
+          >
+            <Database className="w-3 h-3 text-[#38BDF8]" />
+            <span>Supabase: <strong className="text-[#A3E635]">{supabaseConfig.accountName}</strong></span>
+            <span className={`w-1.5 h-1.5 rounded-full ${supabaseConfig.isConnected ? 'bg-[#A3E635]' : 'bg-[#38BDF8]'} inline-block animate-pulse`}></span>
+          </button>
+          <span className="text-[#64748B]">•</span>
+          <span>Chitkara Cyber Forensics Cell</span>
+          <span className="text-[#64748B]">•</span>
+          <span className="text-[#A3E635] flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> ISO 27001 Architecture
+          </span>
         </div>
       </div>
 
@@ -73,20 +124,21 @@ export const Navbar: React.FC = () => {
               INR Pricing
             </button>
             <button
-              onClick={() => navigate('/demo')}
-              className={`hover:text-[#F1F5F9] transition-colors ${currentRoute === '/demo' ? 'text-[#A3E635] font-semibold' : ''}`}
+              onClick={() => navigate('/app/verification')}
+              className={`hover:text-[#F1F5F9] transition-colors flex items-center gap-1 ${currentRoute === '/app/verification' ? 'text-[#38BDF8] font-semibold' : ''}`}
             >
-              Interactive Demo
+              <FileCheck2 className="w-3.5 h-3.5 text-[#38BDF8]" />
+              <span>Verification Lab</span>
             </button>
             <button
               onClick={() => navigate('/app/overview')}
-              className="px-3 py-1 bg-[#172A42] border border-[#38BDF8]/50 text-[#38BDF8] rounded hover:bg-[#1E3A5F] transition-colors"
+              className="px-3 py-1 bg-[#172A42] border border-[#38BDF8]/50 text-[#38BDF8] rounded hover:bg-[#1E3A5F] transition-colors font-medium"
             >
-              Launch Console
+              Console
             </button>
           </nav>
 
-          {/* Right Controls (Language, Role, Billing) */}
+          {/* Right Controls (Language, Auth, Billing) */}
           <div className="flex items-center gap-2">
             {/* Language Switcher */}
             <div className="flex items-center bg-[#0F1D2E] border border-[#1E3A5F] rounded p-0.5 text-xs">
@@ -108,19 +160,102 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
 
-            {/* Role Switcher */}
-            <div className="hidden sm:flex items-center bg-[#0F1D2E] border border-[#1E3A5F] rounded px-2 py-1 text-xs">
-              <User className="w-3.5 h-3.5 text-[#38BDF8] mr-1" />
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className="bg-transparent text-[#F1F5F9] text-xs focus:outline-none cursor-pointer"
-              >
-                <option value="owner" className="bg-[#0F1D2E]">{t.roleOwner}</option>
-                <option value="analyst" className="bg-[#0F1D2E]">{t.roleAnalyst}</option>
-                <option value="viewer" className="bg-[#0F1D2E]">{t.roleViewer}</option>
-              </select>
-            </div>
+            {/* Professional Authentication Buttons / User Pill */}
+            {isAuthenticated && user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 bg-[#0F1D2E] border border-[#1E3A5F] hover:border-[#38BDF8]/50 rounded px-2.5 py-1 text-xs transition-colors"
+                >
+                  <div className="w-5 h-5 rounded-full bg-[#172A42] border border-[#A3E635] flex items-center justify-center text-[10px] font-bold text-[#A3E635]">
+                    {user.fullName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="text-left hidden sm:block">
+                    <div className="text-[#F1F5F9] font-medium leading-none truncate max-w-[110px]">
+                      {user.fullName}
+                    </div>
+                    <div className="text-[9px] font-mono-code text-[#A3E635] leading-tight flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#A3E635]" />
+                      <span>DPDP Verified</span>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-3 h-3 text-[#64748B]" />
+                </button>
+
+                {/* User Dropdown Menu */}
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-[#0F1D2E] border border-[#1E3A5F] rounded-md shadow-2xl p-3 z-50 text-xs animate-fadeIn">
+                    <div className="pb-2 border-b border-[#172A42] space-y-1">
+                      <div className="font-bold text-[#F1F5F9]">{user.fullName}</div>
+                      <div className="text-[11px] text-[#94A3B8] truncate">{user.email}</div>
+                      <div className="text-[10px] font-mono-code text-[#38BDF8]">{user.phone}</div>
+                    </div>
+
+                    <div className="py-2 border-b border-[#172A42] space-y-1 text-[11px] font-mono-code text-[#CBD5E1]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Designation:</span>
+                        <span className="text-[#F1F5F9] capitalize">{user.role}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">OTP Verified:</span>
+                        <span className="text-[#A3E635] flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Active
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Pro Status:</span>
+                        <span className={user.isPro ? 'text-[#A3E635]' : 'text-[#F59E0B]'}>
+                          {user.isPro ? 'Pro Active' : 'Free Tier'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#64748B]">Cloud DB:</span>
+                        <span className="text-[#38BDF8] flex items-center gap-1">
+                          <Database className="w-3 h-3 text-[#A3E635]" /> {supabaseConfig.accountName}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 space-y-1">
+                      <button
+                        onClick={() => {
+                          navigate('/app/settings');
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full text-left py-1.5 px-2 rounded text-[#CBD5E1] hover:bg-[#172A42] transition-colors"
+                      >
+                        Account & Security Profile
+                      </button>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full text-left py-1.5 px-2 rounded text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors flex items-center gap-1.5 font-bold"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => openAuthModal('signin')}
+                  className="px-3 py-1 rounded text-xs font-mono-code text-[#CBD5E1] hover:text-[#F1F5F9] bg-[#0F1D2E] border border-[#1E3A5F] hover:border-[#38BDF8]/40 transition-colors"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => openAuthModal('signup')}
+                  className="px-3 py-1 rounded text-xs font-bold font-mono-code text-[#07111F] bg-[#A3E635] hover:bg-[#bef264] shadow-[0_0_10px_rgba(163,230,53,0.25)] transition-all"
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
 
             {/* Billing Button */}
             <button
@@ -149,31 +284,46 @@ export const Navbar: React.FC = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-2 pt-2 border-t border-[#1E3A5F] space-y-2 text-xs">
             <button
-              onClick={() => { navigate('/'); setIsMobileMenuOpen(false); }}
+              onClick={() => {
+                navigate('/');
+                setIsMobileMenuOpen(false);
+              }}
               className="block w-full text-left py-1 text-[#CBD5E1]"
             >
               Public Hero
             </button>
             <button
-              onClick={() => { navigate('/how-it-works'); setIsMobileMenuOpen(false); }}
+              onClick={() => {
+                navigate('/how-it-works');
+                setIsMobileMenuOpen(false);
+              }}
               className="block w-full text-left py-1 text-[#CBD5E1]"
             >
               How It Works & iNSIGHTS
             </button>
             <button
-              onClick={() => { navigate('/pricing'); setIsMobileMenuOpen(false); }}
+              onClick={() => {
+                navigate('/pricing');
+                setIsMobileMenuOpen(false);
+              }}
               className="block w-full text-left py-1 text-[#CBD5E1]"
             >
               Pricing (₹499/mo)
             </button>
             <button
-              onClick={() => { navigate('/demo'); setIsMobileMenuOpen(false); }}
-              className="block w-full text-left py-1 text-[#CBD5E1]"
+              onClick={() => {
+                navigate('/app/verification');
+                setIsMobileMenuOpen(false);
+              }}
+              className="block w-full text-left py-1 text-[#38BDF8]"
             >
-              Interactive Demo
+              Verification Lab
             </button>
             <button
-              onClick={() => { navigate('/app/overview'); setIsMobileMenuOpen(false); }}
+              onClick={() => {
+                navigate('/app/overview');
+                setIsMobileMenuOpen(false);
+              }}
               className="block w-full text-left py-1 text-[#A3E635] font-bold"
             >
               Launch Console
@@ -183,6 +333,12 @@ export const Navbar: React.FC = () => {
       </header>
 
       <BillingModal isOpen={isBillingOpen} onClose={() => setIsBillingOpen(false)} />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        defaultTab={authModalTab}
+      />
     </>
   );
 };
+

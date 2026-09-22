@@ -15,6 +15,39 @@ import { formatISTDateTime } from '../../utils/formatters.ts';
 export const OverviewPage: React.FC = () => {
   const { activeScan, navigate } = useApp();
 
+  if (!activeScan) {
+    return (
+      <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-lg p-10 text-center space-y-5 max-w-2xl mx-auto my-12">
+        <div className="w-16 h-16 rounded-full bg-[#172A42] border-2 border-[#38BDF8] flex items-center justify-center text-[#38BDF8] mx-auto">
+          <Shield className="w-8 h-8 text-[#38BDF8]" />
+        </div>
+        <div className="space-y-1.5">
+          <h2 className="text-xl font-display font-bold text-[#F1F5F9]">
+            No Active Investigations in Account
+          </h2>
+          <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
+            Your workspace is clean. Create a new digital footprint assessment or load a synthetic verification benchmark to begin forensic analysis.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() => navigate('/app/scans/new')}
+            className="w-full sm:w-auto px-5 py-2.5 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 transition-all shadow-[0_0_12px_rgba(163,230,53,0.25)]"
+          >
+            <Scan className="w-4 h-4" />
+            Start New Assessment
+          </button>
+          <button
+            onClick={() => navigate('/app/verification')}
+            className="w-full sm:w-auto px-5 py-2.5 rounded text-xs font-semibold bg-[#172A42] text-[#38BDF8] border border-[#38BDF8]/40 hover:bg-[#1E3A5F] flex items-center justify-center gap-2 transition-all"
+          >
+            Explore Verification Benchmarks
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const totalFindings = activeScan.findings.length;
   const criticalFindings = activeScan.findings.filter((f) => f.severity === 'high').length;
   const pendingActions = activeScan.actions.filter((a) => a.status === 'pending').length;

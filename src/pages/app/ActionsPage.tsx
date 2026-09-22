@@ -10,8 +10,14 @@ import { useApp } from '../../context/AppContext.tsx';
 import { ActionChecklist } from '../../components/ActionChecklist.tsx';
 import { CheckSquare, Shield, AlertCircle } from 'lucide-react';
 
+import { EmptyInvestigationState } from '../../components/EmptyInvestigationState.tsx';
+
 export const ActionsPage: React.FC = () => {
   const { activeScan } = useApp();
+
+  if (!activeScan) {
+    return <EmptyInvestigationState moduleName="Remediation Tracker" />;
+  }
 
   return (
     <div className="space-y-6">

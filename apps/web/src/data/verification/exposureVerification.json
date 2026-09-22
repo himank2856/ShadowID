@@ -1,0 +1,45 @@
+[
+  {
+    "id": "exp-verify-001",
+    "benchmarkCode": "IN-EXP-TELECOM-TRAI-01",
+    "identifierType": "phone",
+    "identifierMasked": "+91 98881 •••••",
+    "traiCircle": "Punjab / Chandigarh",
+    "carrier": "Airtel India",
+    "leakSource": "Public Git Repository Commit Message (Author Metadata)",
+    "severity": "elevated",
+    "crossConnectableEntities": [
+      "GitHub developer profile (@arun_sharma_99)",
+      "Truecaller public telephone name index",
+      "UPI payment handle directory"
+    ],
+    "verifiedRemediation": "Scrub git commit history with git-filter-repo and set up virtual number forwarding for public projects"
+  },
+  {
+    "id": "exp-verify-002",
+    "benchmarkCode": "IN-EXP-EMAIL-COMPROMISE-02",
+    "identifierType": "email",
+    "identifierMasked": "vikram••••@example.in",
+    "leakSource": "Aggregated Educational Portal SQL Dump (2024 Index)",
+    "severity": "high",
+    "crossConnectableEntities": [
+      "Institutional student enrollment record",
+      "SHA-1 password hash",
+      "City address directory"
+    ],
+    "verifiedRemediation": "Rotate passwords across all registered accounts; activate multi-factor OTP verification immediately"
+  },
+  {
+    "id": "exp-verify-003",
+    "benchmarkCode": "IN-EXP-WHOIS-UNMASKED-03",
+    "identifierType": "whois",
+    "identifierMasked": "domain-defense-in.org",
+    "leakSource": "Public ICANN WHOIS Registrant Record",
+    "severity": "moderate",
+    "crossConnectableEntities": [
+      "Registrant personal postal address in South Delhi",
+      "Administrative contact telephone number"
+    ],
+    "verifiedRemediation": "Enable WHOIS privacy protection proxy via domain registrar to prevent physical identity mapping"
+  }
+]
