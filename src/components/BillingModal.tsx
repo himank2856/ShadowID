@@ -99,6 +99,13 @@ export const BillingModal: React.FC<BillingModalProps> = ({
   // Challenge / 3DS OTP State
   const [otpValue, setOtpValue] = useState<string>('742918');
   const [otpTimer, setOtpTimer] = useState<number>(118);
+  const [copiedUpi, setCopiedUpi] = useState<boolean>(false);
+
+  const handleCopyUpiId = (upiText: string) => {
+    navigator.clipboard.writeText(upiText);
+    setCopiedUpi(true);
+    setTimeout(() => setCopiedUpi(false), 2500);
+  };
 
   // Dynamic QR Code Timer & Animation State
   const [qrTimerSeconds, setQrTimerSeconds] = useState<number>(600); // 10 minutes
@@ -282,10 +289,11 @@ export const BillingModal: React.FC<BillingModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#1E3A5F]/50 transition-colors ml-2"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#172A42] hover:bg-[#EF4444]/20 text-[#94A3B8] hover:text-[#EF4444] border border-[#1E3A5F] hover:border-[#EF4444]/40 transition-colors text-xs font-semibold shadow-sm ml-2"
               title="Close Modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
+              <span>Close</span>
             </button>
           </div>
         </div>
@@ -512,46 +520,80 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                     </button>
                   </div>
 
-                  {/* Submode 1: Dynamic QR Code */}
+                  {/* Submode 1: Authentic Paytm UPI QR Code */}
                   {upiSubMode === 'qr' && (
-                    <div className="flex flex-col sm:flex-row items-center gap-5">
-                      {/* SVG QR Frame with Animated Scanner Line */}
-                      <div className="relative w-48 h-48 bg-white p-2 rounded-xl shadow-lg border-2 border-[#1E3A5F] shrink-0 overflow-hidden flex items-center justify-center">
-                        <div
-                          className="w-full h-full"
-                          dangerouslySetInnerHTML={{ __html: qrSvgMarkup }}
+                    <div className="flex flex-col sm:flex-row items-center gap-6 p-1">
+                      {/* Authentic Paytm UPI QR Frame with Scanning Line */}
+                      <div className="relative w-52 sm:w-56 bg-white p-2.5 rounded-2xl shadow-2xl border-2 border-[#00BAF2] shrink-0 overflow-hidden flex flex-col items-center group">
+                        <img
+                          src="/images/paytm-upi-qr.jpg"
+                          alt="Paytm UPI QR - 7973009420@ptaxis"
+                          className="w-full h-auto object-contain rounded-xl shadow-inner transition-transform group-hover:scale-[1.02]"
                         />
                         {/* Animated Laser Scan Bar */}
-                        <div className="absolute inset-x-0 h-0.5 bg-[#A3E635] shadow-[0_0_8px_#A3E635] animate-pulse pointer-events-none"
+                        <div
+                          className="absolute inset-x-2 h-0.5 bg-[#00BAF2] shadow-[0_0_10px_#00BAF2] animate-pulse pointer-events-none"
                           style={{
-                            top: '40%',
+                            top: '48%',
                             animation: 'bounce 2.5s infinite ease-in-out',
                           }}
                         />
                       </div>
 
-                      <div className="space-y-3 text-xs">
-                        <div className="flex items-center gap-2 text-xs font-mono-code text-[#A3E635]">
-                          <Clock className="w-3.5 h-3.5 animate-spin" />
-                          <span>Expires in: <strong>{formatTimer(qrTimerSeconds)}</strong></span>
+                      <div className="space-y-3 text-xs flex-1 w-full">
+                        {/* Session Timer */}
+                        <div className="flex items-center justify-between text-xs font-mono-code text-[#A3E635] bg-[#0A1628] px-3 py-1.5 rounded-lg border border-[#1E3A5F]">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 animate-spin" />
+                            <span>Session Validity:</span>
+                          </span>
+                          <strong>{formatTimer(qrTimerSeconds)}</strong>
                         </div>
 
-                        <p className="text-[#CBD5E1]">
-                          Scan this dynamic QR code using any UPI payment app on your smartphone:
+                        {/* Verified Receiver UPI Box */}
+                        <div className="p-3 bg-[#07111F] border border-[#1E3A5F] rounded-lg space-y-1.5">
+                          <div className="flex justify-between items-center text-[10px] font-mono-code text-[#64748B]">
+                            <span>OFFICIAL RECEIVER UPI ID:</span>
+                            <span className="text-[#A3E635] flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#A3E635] animate-ping" />
+                              Paytm Axis UPI
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 bg-[#0A1628] p-2 rounded border border-[#1E3A5F]">
+                            <span className="font-mono-code text-sm font-bold text-[#38BDF8] select-all">
+                              7973009420@ptaxis
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyUpiId('7973009420@ptaxis')}
+                              className="px-2.5 py-1 rounded bg-[#172A42] hover:bg-[#1E3A5F] text-[#A3E635] text-[11px] font-mono-code flex items-center gap-1 border border-[#A3E635]/30 transition-colors shadow-sm shrink-0"
+                            >
+                              {copiedUpi ? (
+                                <>
+                                  <Check className="w-3 h-3 text-[#A3E635]" />
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  Copy UPI
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="text-[11px] text-[#94A3B8]">
+                            Banking Entity: <strong className="text-[#F1F5F9]">Axis Bank / Paytm UPI Rail</strong>
+                          </div>
+                        </div>
+
+                        <p className="text-[#CBD5E1] text-[11px] leading-relaxed">
+                          Scan the QR code above with <strong>Paytm</strong>, <strong>PhonePe</strong>, <strong>Google Pay</strong>, or any UPI app to remit <strong className="text-[#A3E635]">{formatINR(currentOrder.totalAmountINR)}</strong> directly.
                         </p>
-
-                        <div className="flex flex-wrap gap-1.5 text-[10px] font-mono-code text-[#94A3B8]">
-                          <span className="bg-[#172A42] px-2 py-0.5 rounded border border-[#1E3A5F]">PhonePe</span>
-                          <span className="bg-[#172A42] px-2 py-0.5 rounded border border-[#1E3A5F]">Google Pay</span>
-                          <span className="bg-[#172A42] px-2 py-0.5 rounded border border-[#1E3A5F]">Paytm</span>
-                          <span className="bg-[#172A42] px-2 py-0.5 rounded border border-[#1E3A5F]">BHIM</span>
-                          <span className="bg-[#172A42] px-2 py-0.5 rounded border border-[#1E3A5F]">CRED</span>
-                        </div>
 
                         <div className="pt-2">
                           <button
                             onClick={handleProceedToAuth}
-                            className="w-full py-2 px-3 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)]"
+                            className="w-full py-2.5 px-3 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)] transition-colors"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
                             Simulate Scan & Authorize Payment
@@ -637,9 +679,18 @@ export const BillingModal: React.FC<BillingModalProps> = ({
 
                       {/* Quick Handle Suggestion Pills */}
                       <div>
-                        <span className="text-[10px] text-[#64748B] block mb-1">Quick PSP handles:</span>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] text-[#64748B]">Quick PSP handles:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleVpaChange('7973009420@ptaxis')}
+                            className="text-[10px] font-mono-code text-[#A3E635] hover:underline"
+                          >
+                            Autofill Merchant ID (7973009420@ptaxis)
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-1.5">
-                          {['@okhdfcbank', '@paytm', '@ybl', '@okaxis', '@icici', '@upi'].map((handle) => (
+                          {['@ptaxis', '@paytm', '@okhdfcbank', '@ybl', '@okaxis', '@icici'].map((handle) => (
                             <button
                               key={handle}
                               type="button"
@@ -952,6 +1003,23 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Step 1 Dedicated Bottom Bar with Close Button */}
+            <div className="lg:col-span-12 pt-3 mt-2 border-t border-[#1E3A5F] flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#EF4444]/10 bg-[#172A42] border border-[#1E3A5F] hover:border-[#EF4444]/40 flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <X className="w-4 h-4" />
+                <span>Cancel & Close</span>
+              </button>
+              <div className="text-[11px] font-mono-code text-[#64748B] flex items-center gap-2">
+                <span>Receiver UPI: <strong className="text-[#38BDF8]">7973009420@ptaxis</strong></span>
+                <span>•</span>
+                <span className="text-[#A3E635]">18% GST Compliant</span>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1016,19 +1084,26 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-2 flex gap-3">
+                <div className="pt-2 flex gap-2.5">
                   <button
                     onClick={() => setCurrentStep('METHOD_SELECT')}
-                    className="w-1/3 py-2 rounded text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#172A42]"
+                    className="flex-1 py-2 rounded text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#172A42] border border-[#1E3A5F]"
                   >
                     Back
                   </button>
                   <button
+                    onClick={onClose}
+                    className="flex-1 py-2 rounded text-xs font-semibold text-[#EF4444] hover:bg-[#EF4444]/15 bg-[#172A42] border border-[#EF4444]/30 flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Close
+                  </button>
+                  <button
                     disabled={otpValue.length < 6}
                     onClick={handleExecuteHandshake}
-                    className="w-2/3 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)] disabled:opacity-50"
+                    className="flex-1 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(163,230,53,0.25)] disabled:opacity-50"
                   >
-                    Submit OTP & Authorize
+                    Submit OTP
                   </button>
                 </div>
               </div>
@@ -1045,9 +1120,9 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                     Approve Notification on your Mobile Device
                   </h4>
                   <p className="text-xs text-[#94A3B8] mt-1">
-                    Open your UPI App (PhonePe, GPay, Paytm) and approve the debit of{' '}
-                    <strong className="text-[#A3E635]">{formatINR(currentOrder.totalAmountINR)}</strong> from{' '}
-                    <span className="font-mono-code text-[#38BDF8]">shadowid.billing@icici</span>
+                    Open your UPI App (Paytm, PhonePe, Google Pay) and approve the debit of{' '}
+                    <strong className="text-[#A3E635]">{formatINR(currentOrder.totalAmountINR)}</strong> to{' '}
+                    <span className="font-mono-code text-[#38BDF8]">7973009420@ptaxis</span>
                   </p>
                 </div>
 
@@ -1060,20 +1135,31 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                     <span>Amount:</span>
                     <span className="text-[#A3E635]">₹{currentOrder.totalAmountINR}.00</span>
                   </div>
+                  <div className="flex justify-between text-[#94A3B8]">
+                    <span>Payee UPI VPA:</span>
+                    <span className="text-[#38BDF8]">7973009420@ptaxis</span>
+                  </div>
                 </div>
 
-                <div className="pt-2 flex gap-3">
+                <div className="pt-2 flex gap-2.5">
                   <button
                     onClick={() => setCurrentStep('METHOD_SELECT')}
-                    className="w-1/3 py-2 rounded text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#172A42]"
+                    className="flex-1 py-2 rounded text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#172A42] border border-[#1E3A5F]"
                   >
-                    Cancel
+                    Back
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="flex-1 py-2 rounded text-xs font-semibold text-[#EF4444] hover:bg-[#EF4444]/15 bg-[#172A42] border border-[#EF4444]/30 flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Close
                   </button>
                   <button
                     onClick={handleExecuteHandshake}
-                    className="w-2/3 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)]"
+                    className="flex-1 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(163,230,53,0.25)]"
                   >
-                    Simulate Device Approval
+                    Approve
                   </button>
                 </div>
               </div>
@@ -1094,18 +1180,25 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                   </p>
                 </div>
 
-                <div className="pt-2 flex gap-3">
+                <div className="pt-2 flex gap-2.5">
                   <button
                     onClick={() => setCurrentStep('METHOD_SELECT')}
-                    className="w-1/3 py-2 rounded text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#172A42]"
+                    className="flex-1 py-2 rounded text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#172A42] border border-[#1E3A5F]"
                   >
                     Back
                   </button>
                   <button
-                    onClick={handleExecuteHandshake}
-                    className="w-2/3 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)]"
+                    onClick={onClose}
+                    className="flex-1 py-2 rounded text-xs font-semibold text-[#EF4444] hover:bg-[#EF4444]/15 bg-[#172A42] border border-[#EF4444]/30 flex items-center justify-center gap-1 transition-colors"
                   >
-                    Confirm & Complete Handshake
+                    <X className="w-3.5 h-3.5" />
+                    Close
+                  </button>
+                  <button
+                    onClick={handleExecuteHandshake}
+                    className="flex-1 py-2 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-1 shadow-[0_0_12px_rgba(163,230,53,0.25)]"
+                  >
+                    Confirm
                   </button>
                 </div>
               </div>
@@ -1377,7 +1470,15 @@ export const BillingModal: React.FC<BillingModalProps> = ({
             </div>
 
             {/* Modal Bottom Done Action */}
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-3 border-t border-[#1E3A5F]">
+              <button
+                type="button"
+                onClick={onClose}
+                className="py-2.5 px-5 rounded-lg text-xs font-semibold text-[#94A3B8] hover:text-[#EF4444] bg-[#172A42] hover:bg-[#EF4444]/10 border border-[#1E3A5F] hover:border-[#EF4444]/30 flex items-center gap-2 transition-colors shadow-sm"
+              >
+                <X className="w-4 h-4" />
+                Close Window
+              </button>
               <button
                 onClick={onClose}
                 className="py-2.5 px-6 rounded-lg text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center gap-2 shadow-[0_0_15px_rgba(163,230,53,0.3)]"

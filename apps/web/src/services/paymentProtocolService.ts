@@ -34,7 +34,7 @@ export const SUPPLIER_METADATA = {
   registeredAddress: 'Unit 402, Chitkara Innovation Hub, Solan-Barotiwala Highway, HP 174103, India',
   nodalContact: 'compliance@shadowid.in',
   razorpayKeyId: 'rzp_test_5h4d0w1d_2026',
-  upiVpaMerchant: 'shadowid.billing@icici',
+  upiVpaMerchant: '7973009420@ptaxis',
 };
 
 // ============================================================================
@@ -265,7 +265,10 @@ export function validateVpa(vpa: string): {
   let pspBank = 'National Payments Corporation of India (NPCI)';
   let verifiedName = 'FORENSIC ACCOUNT HOLDER';
 
-  if (trimmed.endsWith('@okhdfcbank') || trimmed.endsWith('@hdfcbank')) {
+  if (trimmed === '7973009420@ptaxis' || trimmed.endsWith('@ptaxis')) {
+    pspBank = 'Paytm / Axis Bank UPI Rail';
+    verifiedName = trimmed === '7973009420@ptaxis' ? 'SHADOWID VERIFIED RECIPIENT (7973009420)' : 'SHADOWID VERIFIED SUBSCRIBER (PTAXIS)';
+  } else if (trimmed.endsWith('@okhdfcbank') || trimmed.endsWith('@hdfcbank')) {
     pspBank = 'HDFC Bank Ltd. UPI Rail';
     verifiedName = 'SHADOWID VERIFIED INVESTIGATOR (HDFC)';
   } else if (trimmed.endsWith('@okaxis') || trimmed.endsWith('@axisbank')) {
