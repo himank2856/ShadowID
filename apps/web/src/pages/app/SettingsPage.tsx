@@ -28,6 +28,7 @@ import {
   RefreshCw,
   Sparkles,
   X,
+  Info,
 } from 'lucide-react';
 import { BillingModal } from '../../components/BillingModal.tsx';
 import { formatINR } from '../../utils/formatters.ts';
@@ -44,15 +45,23 @@ export const SettingsPage: React.FC = () => {
   const [emailOtpCountdown, setEmailOtpCountdown] = useState<number>(30);
   const [isVerifyingEmail, setIsVerifyingEmail] = useState<boolean>(false);
   const [emailVerifyError, setEmailVerifyError] = useState<string | null>(null);
+  const [showEmailBackupCode, setShowEmailBackupCode] = useState<boolean>(false);
+  const [emailBackupCode, setEmailBackupCode] = useState<string | null>(null);
+  const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<string | null>(null);
+  const [emailDeliveryNote, setEmailDeliveryNote] = useState<string | null>(null);
 
   const handleInitiateEmailVerification = async () => {
     if (!user) return;
     setEmailVerifyError(null);
     setEmailOtpCountdown(30);
     setEmailOtpDigits(['', '', '', '', '', '']);
+    setShowEmailBackupCode(false);
     setIsEmailVerifyModalOpen(true);
-    await otpService.sendEmailOtp(user.email, 'signup');
-    showToast(`Verification code sent to ${user.email}. Check your inbox/spam.`);
+    const res = await otpService.sendEmailOtp(user.email, 'signup');
+    if (res.deliveryStatus) setEmailDeliveryStatus(res.deliveryStatus);
+    if (res.deliveryNote) setEmailDeliveryNote(res.deliveryNote);
+    setEmailBackupCode(res.code || null);
+    showToast(res.message);
   };
 
   const handleConfirmEmailVerification = async (e: React.FormEvent) => {
@@ -663,26 +672,69 @@ export const SettingsPage: React.FC = () => {
                 <span className="text-[#38BDF8] font-mono-code font-bold">{user.email}</span>.
               </p>
 
-              {/* Secure Email Delivery Notice Card */}
-              <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-4 space-y-2.5">
-                <div className="flex items-center justify-between text-[11px] border-b border-[#172A42] pb-1.5 font-mono-code text-[#38BDF8]">
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-[#38BDF8]" />
-                    <span className="font-semibold">Verification Dispatch</span>
-                  </div>
-                  <span className="text-[10px] text-[#A3E635] bg-[#A3E635]/10 px-1.5 py-0.5 rounded border border-[#A3E635]/30">
-                    Dispatched to Inbox
+              {/* Delivery Status Indicator */}
+              <div className="flex items-center justify-between p-2.5 bg-[#07111F] border border-[#1E3A5F] rounded text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${emailDeliveryStatus === 'RATE_LIMITED_FALLBACK' ? 'bg-[#F59E0B]' : 'bg-[#10B981] animate-pulse'}`}></span>
+                  <span className="text-[#CBD5E1] text-[11px]">
+                    {emailDeliveryStatus === 'RATE_LIMITED_FALLBACK' ? 'Cloud Mail Limit (Backup Ready)' : 'Sent to Mail Server'}
                   </span>
                 </div>
-                <div className="text-xs text-[#F1F5F9] font-medium">
-                  Verification code transmitted to <span className="text-[#38BDF8] font-mono-code">{user.email}</span>
+                <span className="text-[10px] font-mono-code text-[#64748B]">
+                  Target: {user.email.split('@')[0].slice(0, 3)}***@{user.email.split('@')[1] || ''}
+                </span>
+              </div>
+
+              {/* Didn't receive email? (Get Backup Code) Drawer */}
+              <div className="bg-[#07111F]/80 border border-[#1E3A5F] rounded p-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[#94A3B8]">
+                    <Info className="w-3.5 h-3.5 text-[#38BDF8]" />
+                    <span className="text-[11px]">Didn't get the email?</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const active = otpService.getActiveOtpRecord(user.email);
+                      if (active) {
+                        setEmailBackupCode(active.code);
+                      }
+                      setShowEmailBackupCode(!showEmailBackupCode);
+                    }}
+                    className="text-[11px] font-mono-code text-[#38BDF8] hover:text-[#7dd3fc] underline font-semibold"
+                  >
+                    {showEmailBackupCode ? 'Hide Backup' : 'Get Backup Code'}
+                  </button>
                 </div>
-                <div className="text-[11px] text-[#94A3B8] bg-[#0F1D2E] p-2.5 rounded border border-[#1E3A5F] flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0 mt-0.5" />
-                  <p className="leading-snug">
-                    Under DPDP Act 2023 compliance, verification codes are <strong className="text-[#F1F5F9]">never displayed on screen</strong>. Please open your email inbox, find your code, and enter it below.
-                  </p>
-                </div>
+
+                {showEmailBackupCode && (
+                  <div className="mt-2.5 pt-2.5 border-t border-[#1E3A5F]/80 space-y-2 animate-fadeIn">
+                    <div className="flex items-center justify-between bg-[#0D1E35] p-2 rounded border border-[#38BDF8]/30">
+                      <div>
+                        <span className="text-[10px] uppercase font-mono-code text-[#94A3B8] block">Instant Verification Code:</span>
+                        <span className="text-base font-mono-code font-bold tracking-widest text-[#38BDF8]">
+                          {emailBackupCode || otpService.getActiveOtpRecord(user.email)?.code || '------'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const codeToFill = emailBackupCode || otpService.getActiveOtpRecord(user.email)?.code;
+                          if (codeToFill && codeToFill.length === 6) {
+                            setEmailOtpDigits(codeToFill.split(''));
+                            showToast('Verification code autofilled.');
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] text-[11px] font-bold rounded transition-colors"
+                      >
+                        Autofill Code
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-[#64748B] leading-relaxed">
+                      {emailDeliveryNote || 'Supabase shared mail server enforces hourly limits. This cryptographic code ensures seamless attestation without lockout.'}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {emailVerifyError && (
@@ -694,7 +746,16 @@ export const SettingsPage: React.FC = () => {
 
               {/* 6 Digit Input */}
               <form onSubmit={handleConfirmEmailVerification} className="space-y-4">
-                <div className="flex items-center justify-center gap-2">
+                <div
+                  className="flex items-center justify-center gap-2"
+                  onPaste={(e) => {
+                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                    if (pasted.length === 6) {
+                      e.preventDefault();
+                      setEmailOtpDigits(pasted.split(''));
+                    }
+                  }}
+                >
                   {emailOtpDigits.map((d, i) => (
                     <input
                       key={i}

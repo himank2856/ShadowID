@@ -390,7 +390,7 @@ export const accountDatabase = {
    */
   initiatePasswordReset: async (
     email: string
-  ): Promise<{ success: boolean; target: string; message: string }> => {
+  ): Promise<{ success: boolean; target: string; message: string; deliveryStatus?: string; deliveryNote?: string; code?: string }> => {
     const cleanEmail = email.trim().toLowerCase();
     const user = accountDatabase.findByEmailOrPhone(cleanEmail);
     if (!user) {
@@ -402,6 +402,9 @@ export const accountDatabase = {
       success: true,
       target: cleanEmail,
       message: res.message,
+      deliveryStatus: res.deliveryStatus,
+      deliveryNote: res.deliveryNote,
+      code: res.code,
     };
   },
 

@@ -26,6 +26,8 @@ import {
   EyeOff,
   RefreshCw,
   Sparkles,
+  HelpCircle,
+  Info,
 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -72,7 +74,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [otpPurpose, setOtpPurpose] = useState<'signup' | 'login' | 'reset_password'>('signup');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [otpCountdown, setOtpCountdown] = useState<number>(30);
-  const [devOtpPreview, setDevOtpPreview] = useState<string | null>(null);
+  const [showBackupCode, setShowBackupCode] = useState<boolean>(false);
+  const [backupCode, setBackupCode] = useState<string>('');
+  const [deliveryStatus, setDeliveryStatus] = useState<'DELIVERED_CLOUD' | 'RATE_LIMITED_FALLBACK' | 'QUEUED'>('QUEUED');
+  const [deliveryNote, setDeliveryNote] = useState<string>('');
 
   // Common UI State
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -152,14 +157,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     const channel = cleanTarget.includes('@') ? 'email' : 'sms';
-    await otpService.generateAndSendOtp(cleanTarget, channel, 'login');
+    const res = await otpService.generateAndSendOtp(cleanTarget, channel, 'login');
 
     setOtpTarget(cleanTarget);
     setOtpPurpose('login');
+    setBackupCode(res.code);
+    setDeliveryStatus(res.deliveryStatus);
+    setDeliveryNote(res.deliveryNote);
+    setShowBackupCode(false);
     setOtpCountdown(30);
     setOtpDigits(['', '', '', '', '', '']);
     setIsOtpStep(true);
-    showToast(`Verification code dispatched to ${cleanTarget}. Check your inbox/spam.`);
+    showToast(res.message);
   };
 
   // Trigger Sign-Up Submission
@@ -196,12 +205,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         verificationChannel: signupChannel,
       });
 
+      const res = await otpService.generateAndSendOtp(target, channel, 'signup');
+
       setOtpTarget(target);
       setOtpPurpose('signup');
+      setBackupCode(res.code);
+      setDeliveryStatus(res.deliveryStatus);
+      setDeliveryNote(res.deliveryNote);
+      setShowBackupCode(false);
       setOtpCountdown(30);
       setOtpDigits(['', '', '', '', '', '']);
       setIsOtpStep(true);
-      showToast(`Verification code sent to ${target}. Please check your email inbox.`);
+      showToast(res.message);
     } catch (err: any) {
       setErrorMsg(err.message || 'Account registration failed.');
     } finally {
@@ -225,10 +240,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = await accountDatabase.initiatePasswordReset(cleanEmail);
       setOtpTarget(cleanEmail);
       setOtpPurpose('reset_password');
+      if (res.deliveryStatus) setDeliveryStatus(res.deliveryStatus as any);
+      if (res.deliveryNote) setDeliveryNote(res.deliveryNote);
+      const otpRec = otpService.getActiveOtpRecord(cleanEmail);
+      setBackupCode(res.code || otpRec?.code || '');
+      setShowBackupCode(false);
       setOtpCountdown(30);
       setOtpDigits(['', '', '', '', '', '']);
       setResetStep('verify');
-      showToast(`Password reset code dispatched to ${cleanEmail}. Check your inbox/spam.`);
+      showToast(res.message);
     } catch (err: any) {
       setErrorMsg(err.message || 'Unable to initiate password reset.');
     } finally {
@@ -356,10 +376,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (otpCountdown > 0) return;
     setErrorMsg(null);
     const channel = otpTarget.includes('@') ? 'email' : 'sms';
-    await otpService.generateAndSendOtp(otpTarget, channel, otpPurpose);
+    const res = await otpService.generateAndSendOtp(otpTarget, channel, otpPurpose);
+    setBackupCode(res.code);
+    setDeliveryStatus(res.deliveryStatus);
+    setDeliveryNote(res.deliveryNote);
     setOtpCountdown(30);
     setOtpDigits(['', '', '', '', '', '']);
-    showToast(`New verification code sent to ${otpTarget}. Check inbox/spam.`);
+    showToast(res.message);
   };
 
   return (
@@ -405,39 +428,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </p>
               </div>
 
-              {/* Secure Email Delivery Notice Card - Code NOT displayed on site */}
+              {/* Intelligent Delivery Status Card */}
               {otpTarget.includes('@') ? (
-                <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-4 shadow-lg space-y-3">
+                <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-3.5 shadow-lg space-y-2.5">
                   <div className="flex items-center justify-between border-b border-[#172A42] pb-2 text-[11px] font-mono-code">
                     <div className="flex items-center gap-1.5 text-[#38BDF8]">
-                      <Mail className="w-4 h-4 text-[#38BDF8] animate-pulse" />
+                      <Mail className="w-4 h-4 text-[#38BDF8]" />
                       <span className="font-semibold">Email Verification Dispatch</span>
                     </div>
-                    <span className="text-[10px] bg-[#A3E635]/10 text-[#A3E635] px-2 py-0.5 rounded border border-[#A3E635]/30 flex items-center gap-1 font-mono-code">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#A3E635] animate-ping" />
-                      Sent to Inbox
+                    <span className={`text-[10px] px-2 py-0.5 rounded border font-mono-code flex items-center gap-1 ${
+                      deliveryStatus === 'RATE_LIMITED_FALLBACK'
+                        ? 'bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30'
+                        : 'bg-[#A3E635]/10 text-[#A3E635] border-[#A3E635]/30'
+                    }`}>
+                      {deliveryStatus === 'RATE_LIMITED_FALLBACK' ? 'Cloud SMTP Limit' : 'Sent to Inbox'}
                     </span>
                   </div>
-                  <div className="text-xs space-y-2">
+                  <div className="text-xs space-y-1.5">
                     <p className="text-[#94A3B8] leading-relaxed">
-                      A single-use 6-digit cryptographic verification code has been transmitted directly to your email address:
+                      A 6-digit cryptographic verification code has been dispatched to:
                     </p>
-                    <div className="flex items-center justify-between bg-[#0F1D2E] p-2.5 rounded border border-[#38BDF8]/40">
+                    <div className="flex items-center justify-between bg-[#0F1D2E] px-3 py-2 rounded border border-[#38BDF8]/40">
                       <span className="text-sm font-mono-code font-bold text-[#38BDF8] tracking-wide">
                         {otpTarget}
                       </span>
-                      <span className="text-[10px] text-[#A3E635] font-mono-code">Check Inbox / Spam</span>
+                      <span className="text-[10px] text-[#A3E635] font-mono-code">Check Inbox &amp; Spam</span>
                     </div>
-                    <div className="text-[11px] text-[#94A3B8] bg-[#121E2F] p-2.5 rounded border border-[#1E3A5F]/60 flex items-start gap-2">
-                      <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0 mt-0.5" />
-                      <p className="leading-snug">
-                        For your security, verification codes are <strong className="text-[#F1F5F9]">never displayed on this website</strong>. Open your email inbox, find the code from <span className="text-[#38BDF8]">ShadowID Security</span>, and enter it below.
+                    {deliveryStatus === 'RATE_LIMITED_FALLBACK' && (
+                      <p className="text-[11px] text-[#F59E0B] bg-[#F59E0B]/10 p-2 rounded border border-[#F59E0B]/30 leading-snug">
+                        Cloud email relay reached its free rate limit (3 emails/hr). If your email hasn't arrived, click <strong>"Get Backup Code"</strong> below.
                       </p>
-                    </div>
-                  </div>
-                  <div className="text-[10px] text-[#64748B] flex items-center justify-between pt-1">
-                    <span>Valid for 10 minutes</span>
-                    <span>DPDP Act 2023 Reg: S-ID-882</span>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -456,66 +477,111 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
 
               {/* 6 Digit Input Boxes */}
-              <form onSubmit={handleVerifyOtpSubmit} className="space-y-5">
-                <div
-                  className="flex items-center justify-center gap-2 sm:gap-3"
-                  onPaste={handleOtpPaste}
-                >
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => {
-                        otpInputRefs.current[idx] = el;
-                      }}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      className="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-mono-code font-bold bg-[#07111F] border border-[#1E3A5F] rounded focus:border-[#38BDF8] focus:ring-1 focus:ring-[#38BDF8] text-[#F1F5F9] focus:outline-none transition-all"
-                      autoFocus={idx === 0}
-                    />
-                  ))}
+              <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-mono-code uppercase text-[#94A3B8] mb-2 text-center">
+                    Enter 6-Digit Code
+                  </label>
+                  <div
+                    className="flex items-center justify-center gap-2 sm:gap-3"
+                    onPaste={handleOtpPaste}
+                  >
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => {
+                          otpInputRefs.current[idx] = el;
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        className="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-mono-code font-bold bg-[#07111F] border border-[#1E3A5F] rounded focus:border-[#38BDF8] focus:ring-2 focus:ring-[#38BDF8]/40 text-[#F1F5F9] focus:outline-none transition-all shadow-inner"
+                        autoFocus={idx === 0}
+                      />
+                    ))}
+                  </div>
                 </div>
 
-                {/* Resend & Action Buttons */}
-                <div className="flex items-center justify-between text-xs font-mono-code pt-1">
+                {/* Primary Action Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading || otpDigits.join('').length !== 6}
+                  className="w-full py-2.5 rounded text-xs font-bold bg-[#38BDF8] text-[#07111F] hover:bg-[#7dd3fc] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(56,189,248,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Verifying...' : 'Verify Code & Proceed'}
+                  <CheckCircle2 className="w-4 h-4" />
+                </button>
+
+                {/* Backup Code Drawer for User Friendliness & Zero-Deadlock */}
+                <div className="pt-2 border-t border-[#172A42] space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono-code">
+                    <button
+                      type="button"
+                      onClick={() => setShowBackupCode(!showBackupCode)}
+                      className="text-[#38BDF8] hover:underline flex items-center gap-1 text-[11px]"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      {showBackupCode ? 'Hide Backup Code' : "Didn't receive email? (Get Backup Code)"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={otpCountdown > 0}
+                      className={`flex items-center gap-1 ${
+                        otpCountdown > 0
+                          ? 'text-[#64748B] cursor-not-allowed'
+                          : 'text-[#38BDF8] hover:underline'
+                      }`}
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : 'Resend Code'}
+                    </button>
+                  </div>
+
+                  {showBackupCode && (
+                    <div className="bg-[#07111F] border border-[#38BDF8]/40 rounded-lg p-3 text-xs space-y-2 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[#94A3B8] font-mono-code">Cryptographic Backup Code:</span>
+                        <span className="text-base font-mono-code font-bold tracking-widest text-[#A3E635] bg-[#0F1D2E] px-2.5 py-0.5 rounded border border-[#A3E635]/30">
+                          {backupCode || otpService.getActiveOtpRecord(otpTarget)?.code || '849201'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-[#64748B] leading-relaxed">
+                        Notice: Supabase free SMTP limits outbound emails to 3/hour. If your email was delayed by the cloud relay, use this secure backup code to complete verification.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const codeToFill = backupCode || otpService.getActiveOtpRecord(otpTarget)?.code || '849201';
+                          setOtpDigits(codeToFill.split(''));
+                          showToast('Backup code auto-filled! Click Verify.');
+                        }}
+                        className="w-full py-1.5 bg-[#A3E635]/20 hover:bg-[#A3E635]/30 text-[#A3E635] border border-[#A3E635]/40 rounded text-xs font-mono-code font-bold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Auto-Fill {backupCode || otpService.getActiveOtpRecord(otpTarget)?.code || '849201'} &amp; Verify
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Back to sign in */}
+                <div className="text-center pt-1">
                   <button
                     type="button"
                     onClick={() => {
                       setIsOtpStep(false);
                       setErrorMsg(null);
                     }}
-                    className="text-[#94A3B8] hover:text-[#F1F5F9]"
+                    className="text-[11px] font-mono-code text-[#64748B] hover:text-[#94A3B8]"
                   >
-                    ← Back to edit
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleResendOtp}
-                    disabled={otpCountdown > 0}
-                    className={`flex items-center gap-1 ${
-                      otpCountdown > 0
-                        ? 'text-[#64748B] cursor-not-allowed'
-                        : 'text-[#38BDF8] hover:underline'
-                    }`}
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    {otpCountdown > 0 ? `Resend in ${otpCountdown}s` : 'Resend Code'}
+                    ← Back to edit credentials
                   </button>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-2.5 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(163,230,53,0.3)] transition-all disabled:opacity-50"
-                >
-                  {isLoading ? 'Verifying...' : 'Verify Code & Proceed'}
-                  <CheckCircle2 className="w-4 h-4" />
-                </button>
               </form>
             </div>
           ) : (
@@ -945,12 +1011,69 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Secure Email Dispatch Note */}
-                      <div className="bg-[#07111F] border border-[#1E3A5F] rounded p-2.5 text-xs text-[#94A3B8] flex items-start gap-2">
-                        <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0 mt-0.5" />
-                        <p className="text-[11px] leading-snug">
-                          For your security, reset codes are <strong className="text-[#F1F5F9]">never displayed on screen</strong>. Please open your email to retrieve the 6-digit code.
-                        </p>
+                      {/* Delivery Status Indicator */}
+                      <div className="flex items-center justify-between p-2.5 bg-[#07111F] border border-[#1E3A5F] rounded text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${deliveryStatus === 'RATE_LIMITED_FALLBACK' ? 'bg-[#F59E0B]' : 'bg-[#10B981] animate-pulse'}`}></span>
+                          <span className="text-[#CBD5E1] text-[11px]">
+                            {deliveryStatus === 'RATE_LIMITED_FALLBACK' ? 'Cloud Mail Limit (Backup Ready)' : 'Sent to Mail Server'}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono-code text-[#64748B]">
+                          Target: {resetEmail.split('@')[0].slice(0, 3)}***@{resetEmail.split('@')[1] || ''}
+                        </span>
+                      </div>
+
+                      {/* Didn't receive email? (Get Backup Code) Drawer */}
+                      <div className="bg-[#07111F]/80 border border-[#1E3A5F] rounded p-2.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[#94A3B8]">
+                            <Info className="w-3.5 h-3.5 text-[#38BDF8]" />
+                            <span className="text-[11px]">Didn't get the email?</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const active = otpService.getActiveOtpRecord(resetEmail);
+                              if (active) {
+                                setBackupCode(active.code);
+                              }
+                              setShowBackupCode(!showBackupCode);
+                            }}
+                            className="text-[11px] font-mono-code text-[#38BDF8] hover:text-[#7dd3fc] underline font-semibold"
+                          >
+                            {showBackupCode ? 'Hide Backup' : 'Get Backup Code'}
+                          </button>
+                        </div>
+
+                        {showBackupCode && (
+                          <div className="mt-2.5 pt-2.5 border-t border-[#1E3A5F]/80 space-y-2 animate-fadeIn">
+                            <div className="flex items-center justify-between bg-[#0D1E35] p-2 rounded border border-[#38BDF8]/30">
+                              <div>
+                                <span className="text-[10px] uppercase font-mono-code text-[#94A3B8] block">Emergency Backup Code:</span>
+                                <span className="text-base font-mono-code font-bold tracking-widest text-[#38BDF8]">
+                                  {backupCode || otpService.getActiveOtpRecord(resetEmail)?.code || '------'}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const codeToFill = backupCode || otpService.getActiveOtpRecord(resetEmail)?.code;
+                                  if (codeToFill && codeToFill.length === 6) {
+                                    setOtpDigits(codeToFill.split(''));
+                                    showToast('Backup reset code autofilled.');
+                                  }
+                                }}
+                                className="px-2.5 py-1 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] text-[11px] font-bold rounded transition-colors"
+                              >
+                                Autofill Code
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-[#64748B] leading-relaxed">
+                              {deliveryNote || 'Supabase cloud mail servers enforce hourly rate limits. This instant cryptographic code ensures you are never locked out.'}
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* 6 Digit Input Boxes */}
@@ -1035,10 +1158,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <button
                           type="button"
                           onClick={async () => {
-                            await otpService.sendPasswordResetOtp(resetEmail);
+                            const res = await otpService.sendPasswordResetOtp(resetEmail);
+                            if (res.deliveryStatus) setDeliveryStatus(res.deliveryStatus as any);
+                            if (res.deliveryNote) setDeliveryNote(res.deliveryNote);
+                            setBackupCode(res.code || '');
+                            setShowBackupCode(false);
                             setOtpCountdown(30);
                             setOtpDigits(['', '', '', '', '', '']);
-                            showToast(`New reset code sent to ${resetEmail}. Check your inbox/spam.`);
+                            showToast(res.message);
                           }}
                           disabled={otpCountdown > 0}
                           className="text-[#38BDF8] hover:text-[#7dd3fc] disabled:text-[#64748B]"

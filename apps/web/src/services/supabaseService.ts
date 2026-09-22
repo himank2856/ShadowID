@@ -27,17 +27,19 @@ function loadStoredConfig(): SupabaseConfig {
   const envKey = env.VITE_SUPABASE_ANON_KEY || '';
 
   try {
-    const raw = localStorage.getItem(SUPABASE_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        accountName: parsed.accountName || envAccount,
-        projectUrl: parsed.projectUrl || envUrl,
-        anonKey: parsed.anonKey || envKey,
-        isConnected: !!(parsed.projectUrl && parsed.anonKey && parsed.isConnected),
-        lastConnectedAt: parsed.lastConnectedAt,
-        lastError: parsed.lastError,
-      };
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(SUPABASE_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          accountName: parsed.accountName || envAccount,
+          projectUrl: parsed.projectUrl || envUrl,
+          anonKey: parsed.anonKey || envKey,
+          isConnected: !!(parsed.projectUrl && parsed.anonKey && parsed.isConnected),
+          lastConnectedAt: parsed.lastConnectedAt,
+          lastError: parsed.lastError,
+        };
+      }
     }
   } catch (err) {
     console.warn('Failed to read Supabase configuration from storage:', err);
