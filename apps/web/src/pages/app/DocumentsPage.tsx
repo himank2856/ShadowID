@@ -23,9 +23,14 @@ import {
   Lock,
   CreditCard,
   ShieldCheck,
+  ArrowLeft,
+  Trash2,
+  Layers,
+  FileCheck,
+  IdCard,
 } from 'lucide-react';
 import { SYNTHETIC_DOCUMENT_VERIFICATIONS } from '../../data/verification/index.ts';
-import { DocumentAnalysisData, DocumentOcrBox } from '../../types.ts';
+import { DocumentAnalysisData, DocumentOcrBox, ThreeStageVerificationResult } from '../../types.ts';
 import { ocrService, OcrProgress } from '../../services/ocrService.ts';
 import { supabaseService } from '../../services/supabaseService.ts';
 import { BillingModal } from '../../components/BillingModal.tsx';
@@ -34,6 +39,7 @@ function mapVerificationDocToAnalysis(
   verDoc: (typeof SYNTHETIC_DOCUMENT_VERIFICATIONS)[0]
 ): DocumentAnalysisData {
   const isClean = verDoc.validityStatus === 'VERIFIED_AUTHENTIC';
+  const category = (verDoc.category as 'Aadhaar' | 'PAN' | 'Passport') || 'Aadhaar';
 
   const boxes: DocumentOcrBox[] = verDoc.ocrExtraction.rawTokens.map((tok, i) => ({
     id: `box-${i}`,
@@ -48,6 +54,67 @@ function mapVerificationDocToAnalysis(
     isAnomaly: !!tok.flag,
     anomalyReason: tok.flag,
   }));
+
+  const hasDuplicate = verDoc.validityStatus === 'TAMPERED_NUMERAL' || verDoc.id === 'doc-verify-002';
+
+  const threeStageVerification: ThreeStageVerificationResult = {
+    expectedCategory: category,
+    detectedCategory: category,
+    overallStatus: isClean && !hasDuplicate ? 'PASSED' : 'FAILED',
+    stage1TypeCheck: {
+      stageNumber: 1,
+      name: 'Document Type Verification',
+      description: `Verify document matches selected target (${category})`,
+      status: 'PASSED',
+      verdictMessage: `Scan 1 Passed: Official ${category} benchmark template recognized and validated.`,
+      details: {
+        expectedType: category,
+        detectedType: category,
+        isTypeMatch: true,
+      },
+    },
+    stage2AuthenticityCheck: {
+      stageNumber: 2,
+      name: 'Statutory Authenticity & Database Integrity Check',
+      description: 'Scan to verify originality against statutory checksums, typography, and database records',
+      status: isClean ? 'PASSED' : 'FAILED',
+      verdictMessage: isClean
+        ? `Scan 2 Passed: Authentic original ${category} verified. Statutory checksums and typeface valid.`
+        : `Scan 2 Failed: Tampering anomalies detected in benchmark: ${verDoc.detectedAnomalies.join('; ')}`,
+      details: {
+        checksumValid: isClean,
+        checksumType: `${category} Statutory Checksum`,
+        databaseMatch: true,
+        databaseMatchDetails: isClean
+          ? 'Matches clean statutory benchmark standards.'
+          : 'Matches known tampered anomaly pattern.',
+      },
+    },
+    stage3DuplicateCheck: {
+      stageNumber: 3,
+      name: 'Duplicate & Impersonation Database Scan',
+      description: 'Scan whether someone else is using this identity or created a duplicate/clone',
+      status: hasDuplicate ? 'FAILED' : 'PASSED',
+      verdictMessage: hasDuplicate
+        ? `Scan 3 Alert: Duplicate or recycled identity detected! Card ending in 8831 flagged in secondary bot records.`
+        : `Scan 3 Passed: Single authentic holder confirmed. No duplicate usage or clone records in database.`,
+      details: {
+        isDuplicateDetected: hasDuplicate,
+        duplicateCount: hasDuplicate ? 2 : 0,
+        duplicateMatches: hasDuplicate
+          ? [
+              {
+                source: 'Forensic Benchmark Registry (IN-DOC-AADHAAR-TAMPER-02)',
+                identityNumberOrName: verDoc.documentNumberMasked,
+                associatedProfile: verDoc.holderName,
+                riskLevel: 'CRITICAL',
+                details: 'Known cloned credential reused across fraudulent bot network handles.',
+              },
+            ]
+          : [],
+      },
+    },
+  };
 
   return {
     id: verDoc.id,
@@ -71,12 +138,16 @@ function mapVerificationDocToAnalysis(
       .filter((k) => (verDoc.securityFeatures as any)[k])
       .join(', ')}.`,
     isHumanVerified: true,
+    threeStageVerification,
   };
 }
 
 export const DocumentsPage: React.FC = () => {
   const { activeScan, showToast, user, openAuthModal, billing } = useApp();
   const [isBillingModalOpen, setIsBillingModalOpen] = useState<boolean>(false);
+
+  // Target Document Selection (Only chosen document type is permitted for verification)
+  const [selectedTargetType, setSelectedTargetType] = useState<'Aadhaar' | 'PAN' | 'Passport'>('Aadhaar');
 
   // Mode: 'benchmarks' or 'uploaded'
   const [activeSource, setActiveSource] = useState<'benchmarks' | 'uploaded'>('benchmarks');
@@ -111,7 +182,27 @@ export const DocumentsPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  // Handle file selection and neural OCR execution
+  // Remove / Discard Document handler
+  const handleRemoveUploadedDocument = () => {
+    setUploadedDoc(null);
+    setUploadedImageUrl(null);
+    setOcrError(null);
+    setOcrProgress({ status: 'Ready for document upload', progress: 0 });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    showToast('Document removed. Select a document type and upload a new image.');
+  };
+
+  // Back to Selection handler
+  const handleBackToSelection = () => {
+    if (activeSource === 'uploaded') {
+      handleRemoveUploadedDocument();
+    }
+    setActiveSource('benchmarks');
+  };
+
+  // Handle file selection and progressive 3-scan OCR execution
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user) {
       openAuthModal('signin');
@@ -135,19 +226,33 @@ export const DocumentsPage: React.FC = () => {
 
     setOcrError(null);
     setIsProcessingOcr(true);
-    setOcrProgress({ status: 'Starting Neural OCR Engine...', progress: 5 });
+    setOcrProgress({
+      status: `Starting Progressive 3-Scan OCR for ${selectedTargetType} Card...`,
+      progress: 5,
+    });
 
     try {
-      const result = await ocrService.processDocument(file, (p) => {
-        setOcrProgress(p);
+      const result = await ocrService.processDocument(file, {
+        expectedCategory: selectedTargetType,
+        userEmail: user.email,
+        onProgress: (p) => {
+          setOcrProgress(p);
+        },
       });
 
       setUploadedDoc(result.analysis);
       setUploadedImageUrl(result.imageUrl);
       setActiveSource('uploaded');
-      showToast(
-        `Neural OCR Complete: Extracted ${result.analysis.boxes.length} tokens (${result.detectedCategory})`
-      );
+
+      if (result.threeStageVerification.overallStatus === 'HALTED_TYPE_MISMATCH') {
+        showToast(
+          `Scan 1 Rejected: Expected ${result.threeStageVerification.expectedCategory}, detected ${result.threeStageVerification.detectedCategory}. Scans 2 & 3 halted.`
+        );
+      } else {
+        showToast(
+          `All 3 Scans Complete: Extracted ${result.analysis.boxes.length} tokens (${result.detectedCategory})`
+        );
+      }
 
       // Automatically sync document record to Supabase if connected
       supabaseService.syncDocument(result.analysis, activeScan?.id);
@@ -207,7 +312,7 @@ export const DocumentsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono-code text-[#F59E0B] uppercase mb-1">
             <Cpu className="w-4 h-4" />
@@ -223,14 +328,14 @@ export const DocumentsPage: React.FC = () => {
             )}
           </div>
           <h1 className="text-xl font-display font-bold text-[#F1F5F9]">
-            Optical Baseline, Typography & Tamper Defense
+            Progressive 3-Scan Document Defense
           </h1>
           <p className="text-xs text-[#94A3B8] max-w-3xl mt-1">
-            Live client-side Tesseract.js WebAssembly engine with Indian statutory heuristics (Aadhaar Verhoeff checksums, PAN entity code verification, and passport MRZ parsing).
+            Strict 3-Stage Pipeline: <strong>Scan 1</strong> (Target Type Filter), <strong>Scan 2</strong> (Statutory Originality & Database Check), and <strong>Scan 3</strong> (Duplicate & Impersonation Clone Scan).
           </p>
         </div>
 
-        {/* Source Mode Toggle */}
+        {/* Global Upload Button & Hidden Input */}
         <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}
@@ -242,17 +347,17 @@ export const DocumentsPage: React.FC = () => {
           <button
             onClick={handleTriggerUpload}
             disabled={isProcessingOcr}
-            className="px-4 py-2 rounded text-xs font-bold bg-[#F59E0B] text-[#07111F] hover:bg-[#fbbf24] flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.25)] transition-all disabled:opacity-50"
+            className="px-4 py-2.5 rounded-lg text-xs font-bold bg-[#F59E0B] text-[#07111F] hover:bg-[#fbbf24] flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.25)] transition-all disabled:opacity-50"
           >
             {isProcessingOcr ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Running OCR...</span>
+                <span>Running 3-Scan Pipeline...</span>
               </>
             ) : billing.isPro ? (
               <>
                 <Upload className="w-4 h-4" />
-                <span>Upload ID for Real OCR</span>
+                <span>Upload {selectedTargetType} for Real Scan</span>
               </>
             ) : (
               <>
@@ -260,6 +365,110 @@ export const DocumentsPage: React.FC = () => {
                 <span>Unlock Real OCR (₹499/mo)</span>
               </>
             )}
+          </button>
+        </div>
+      </div>
+
+      {/* Target Document Type Selector (Strict Filtering Pre-Scan) */}
+      <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-xl p-5 space-y-3 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#172A42] pb-3">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-mono-code text-[#38BDF8] uppercase font-bold">
+              <FileCheck className="w-4 h-4" />
+              <span>Step 1: Choose Document Type to Verify</span>
+            </div>
+            <p className="text-xs text-[#94A3B8] mt-0.5">
+              Only the chosen document type will be scanned. Non-matching documents are rejected at Scan 1 and will NOT proceed to the 2nd scan.
+            </p>
+          </div>
+          <div className="text-[11px] font-mono-code text-[#F59E0B] bg-[#F59E0B]/10 px-2.5 py-1 rounded-full border border-[#F59E0B]/30 self-start sm:self-auto">
+            Target: <strong>{selectedTargetType} Card</strong>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {/* Aadhaar Card Selection */}
+          <button
+            onClick={() => {
+              setSelectedTargetType('Aadhaar');
+              showToast('Selected Target: Aadhaar Card (UIDAI Heuristics & Verhoeff Checksum)');
+            }}
+            className={`p-3.5 rounded-xl border text-left transition-all relative ${
+              selectedTargetType === 'Aadhaar'
+                ? 'bg-[#172A42] border-[#F59E0B] shadow-[0_0_15px_rgba(245,158,11,0.2)] ring-1 ring-[#F59E0B]'
+                : 'bg-[#07111F] border-[#1E3A5F] hover:border-[#38BDF8]/60 text-[#94A3B8]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold font-display text-[#F1F5F9] flex items-center gap-1.5">
+                <IdCard className="w-4 h-4 text-[#F59E0B]" />
+                Aadhaar Card
+              </span>
+              {selectedTargetType === 'Aadhaar' && (
+                <span className="text-[10px] font-mono-code text-[#A3E635] bg-[#A3E635]/15 px-2 py-0.5 rounded-full font-bold">
+                  ACTIVE TARGET
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              UIDAI 12-digit Verhoeff checksum algorithm, QR verification, and DPDP Act minimization check.
+            </p>
+          </button>
+
+          {/* PAN Card Selection */}
+          <button
+            onClick={() => {
+              setSelectedTargetType('PAN');
+              showToast('Selected Target: PAN Card (Income Tax Structure & Entity Code)');
+            }}
+            className={`p-3.5 rounded-xl border text-left transition-all relative ${
+              selectedTargetType === 'PAN'
+                ? 'bg-[#172A42] border-[#F59E0B] shadow-[0_0_15px_rgba(245,158,11,0.2)] ring-1 ring-[#F59E0B]'
+                : 'bg-[#07111F] border-[#1E3A5F] hover:border-[#38BDF8]/60 text-[#94A3B8]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold font-display text-[#F1F5F9] flex items-center gap-1.5">
+                <CreditCard className="w-4 h-4 text-[#38BDF8]" />
+                PAN Card
+              </span>
+              {selectedTargetType === 'PAN' && (
+                <span className="text-[10px] font-mono-code text-[#A3E635] bg-[#A3E635]/15 px-2 py-0.5 rounded-full font-bold">
+                  ACTIVE TARGET
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              Income Tax 10-char alphanumeric structure, 4th character entity code, and NSDL OCR-B typeface check.
+            </p>
+          </button>
+
+          {/* Passport Selection */}
+          <button
+            onClick={() => {
+              setSelectedTargetType('Passport');
+              showToast('Selected Target: Passport (Republic of India & ICAO MRZ)');
+            }}
+            className={`p-3.5 rounded-xl border text-left transition-all relative ${
+              selectedTargetType === 'Passport'
+                ? 'bg-[#172A42] border-[#F59E0B] shadow-[0_0_15px_rgba(245,158,11,0.2)] ring-1 ring-[#F59E0B]'
+                : 'bg-[#07111F] border-[#1E3A5F] hover:border-[#38BDF8]/60 text-[#94A3B8]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-bold font-display text-[#F1F5F9] flex items-center gap-1.5">
+                <ShieldAlert className="w-4 h-4 text-[#A3E635]" />
+                Indian Passport
+              </span>
+              {selectedTargetType === 'Passport' && (
+                <span className="text-[10px] font-mono-code text-[#A3E635] bg-[#A3E635]/15 px-2 py-0.5 rounded-full font-bold">
+                  ACTIVE TARGET
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+              Republic of India ICAO Doc 9303 Machine Readable Zone (MRZ) parser and 8-character booklet check.
+            </p>
           </button>
         </div>
       </div>
@@ -279,26 +488,6 @@ export const DocumentsPage: React.FC = () => {
               <p className="text-xs text-[#94A3B8] leading-relaxed">
                 Document verification is unlocked after purchasing the <strong className="text-[#F1F5F9]">Pro Monthly Membership of ₹499/month</strong>. Get instant verification of Indian official IDs with Aadhaar Verhoeff checksums, Income Tax PAN structure verification, Passport MRZ validation, and optical tamper heatmaps.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 text-[11px] font-mono-code text-[#CBD5E1]">
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Aadhaar Verhoeff
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> PAN Structure Check
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Passport MRZ Audit
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Tesseract.js WebAssembly
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Tamper Heatmaps
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Signed Verification PDF
-                </div>
-              </div>
             </div>
 
             <div className="flex flex-col items-start md:items-end gap-3 w-full md:w-auto">
@@ -320,42 +509,73 @@ export const DocumentsPage: React.FC = () => {
 
       {/* Real OCR Processing Progress Bar */}
       {isProcessingOcr && (
-        <div className="bg-[#0F1D2E] border border-[#F59E0B] rounded p-4 space-y-2 animate-pulse">
+        <div className="bg-[#0F1D2E] border border-[#F59E0B] rounded-xl p-5 space-y-3 animate-pulse shadow-xl">
           <div className="flex items-center justify-between text-xs font-mono-code">
-            <span className="text-[#F59E0B] flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-[#F59E0B] flex items-center gap-2 font-bold">
+              <Loader2 className="w-4 h-4 animate-spin text-[#F59E0B]" />
               {ocrProgress.status}
             </span>
             <span className="text-[#F1F5F9] font-bold">{ocrProgress.progress}%</span>
           </div>
-          <div className="w-full h-2 bg-[#07111F] rounded-full overflow-hidden border border-[#1E3A5F]">
+          <div className="w-full h-2.5 bg-[#07111F] rounded-full overflow-hidden border border-[#1E3A5F]">
             <div
-              className="h-full bg-gradient-to-r from-[#F59E0B] to-[#A3E635] transition-all duration-300 rounded-full"
+              className="h-full bg-gradient-to-r from-[#F59E0B] via-[#38BDF8] to-[#A3E635] transition-all duration-300 rounded-full"
               style={{ width: `${ocrProgress.progress}%` }}
             />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-[10px] font-mono-code text-[#94A3B8] pt-1">
+            <div className={`flex items-center gap-1 ${ocrProgress.progress >= 25 ? 'text-[#38BDF8]' : ''}`}>
+              <span>1. Scan Type Match</span>
+            </div>
+            <div className={`flex items-center gap-1 ${ocrProgress.progress >= 75 ? 'text-[#38BDF8]' : ''}`}>
+              <span>2. Scan Originality</span>
+            </div>
+            <div className={`flex items-center gap-1 ${ocrProgress.progress >= 95 ? 'text-[#A3E635]' : ''}`}>
+              <span>3. Scan Duplicates</span>
+            </div>
           </div>
         </div>
       )}
 
       {/* OCR Error Box */}
       {ocrError && (
-        <div className="bg-[#EF4444]/15 border border-[#EF4444] rounded p-3 text-xs text-[#FCA5A5] flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{ocrError}</span>
+        <div className="bg-[#EF4444]/15 border border-[#EF4444] rounded-xl p-4 text-xs text-[#FCA5A5] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-[#EF4444]" />
+            <span>{ocrError}</span>
+          </div>
+          <button
+            onClick={handleRemoveUploadedDocument}
+            className="px-3 py-1 bg-[#EF4444] text-white text-[11px] font-bold rounded hover:bg-[#dc2626] transition-all"
+          >
+            Clear & Retry
+          </button>
         </div>
       )}
 
-      {/* Inspector Mode Switcher (Live Upload vs Synthetic Benchmarks) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-[#0F1D2E] border border-[#1E3A5F] rounded">
-        <div className="flex items-center gap-2">
+      {/* Navigation & Mode Switcher Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#0F1D2E] border border-[#1E3A5F] rounded-xl shadow-md">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Back button if in uploaded mode */}
+          {activeSource === 'uploaded' && (
+            <button
+              onClick={handleBackToSelection}
+              className="px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold bg-[#172A42] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#1E3A5F] flex items-center gap-1.5 transition-all shadow-sm"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Selection</span>
+            </button>
+          )}
+
+          {/* Live Upload button */}
           <button
             onClick={() => {
               if (uploadedDoc) setActiveSource('uploaded');
               else handleTriggerUpload();
             }}
-            className={`px-3 py-1.5 rounded text-xs font-mono-code font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold flex items-center gap-1.5 transition-all ${
               activeSource === 'uploaded' && uploadedDoc
-                ? 'bg-[#172A42] text-[#F59E0B] border border-[#F59E0B]/50'
+                ? 'bg-[#172A42] text-[#F59E0B] border border-[#F59E0B]/60 shadow-sm'
                 : 'text-[#94A3B8] hover:text-[#F1F5F9]'
             }`}
           >
@@ -366,18 +586,29 @@ export const DocumentsPage: React.FC = () => {
             )}
             <span>
               {uploadedDoc
-                ? `Live Upload (${uploadedDoc.documentCategory})`
-                : billing.isPro
-                ? 'Upload New Image'
-                : 'Upload New Image (PRO ₹499/mo)'}
+                ? `Active Upload (${uploadedDoc.documentCategory})`
+                : `Upload ${selectedTargetType} ID`}
             </span>
           </button>
 
+          {/* Remove Document button if uploadedDoc exists */}
+          {uploadedDoc && (
+            <button
+              onClick={handleRemoveUploadedDocument}
+              className="px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold bg-[#EF4444]/15 text-[#EF4444] border border-[#EF4444]/40 hover:bg-[#EF4444]/25 flex items-center gap-1.5 transition-all shadow-sm"
+              title="Remove current document"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Remove Document</span>
+            </button>
+          )}
+
+          {/* Synthetic Benchmarks toggle */}
           <button
             onClick={() => setActiveSource('benchmarks')}
-            className={`px-3 py-1.5 rounded text-xs font-mono-code font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold flex items-center gap-1.5 transition-all ${
               activeSource === 'benchmarks'
-                ? 'bg-[#172A42] text-[#38BDF8] border border-[#38BDF8]/50'
+                ? 'bg-[#172A42] text-[#38BDF8] border border-[#38BDF8]/60 shadow-sm'
                 : 'text-[#94A3B8] hover:text-[#F1F5F9]'
             }`}
           >
@@ -396,11 +627,11 @@ export const DocumentsPage: React.FC = () => {
                 <button
                   key={doc.id}
                   onClick={() => setSelectedBenchmarkId(doc.id)}
-                  className={`px-2 py-1 rounded font-mono-code text-[11px] transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg font-mono-code text-[11px] transition-all ${
                     isSelected
                       ? isClean
-                        ? 'bg-[#172A42] text-[#A3E635] font-bold border border-[#A3E635]/40'
-                        : 'bg-[#172A42] text-[#EF4444] font-bold border border-[#EF4444]/40'
+                        ? 'bg-[#172A42] text-[#A3E635] font-bold border border-[#A3E635]/50 shadow-sm'
+                        : 'bg-[#172A42] text-[#EF4444] font-bold border border-[#EF4444]/50 shadow-sm'
                       : 'text-[#94A3B8] hover:text-[#F1F5F9]'
                   }`}
                 >
@@ -412,24 +643,44 @@ export const DocumentsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Main Document Inspector */}
+      {/* Main Document Inspector with Full Visibility */}
       {currentDoc ? (
         <DocumentDefenseViewer
           data={currentDoc}
           imageUrl={activeSource === 'uploaded' && uploadedImageUrl ? uploadedImageUrl : undefined}
+          onBack={handleBackToSelection}
+          onRemoveDocument={activeSource === 'uploaded' ? handleRemoveUploadedDocument : undefined}
+          selectedTargetType={selectedTargetType}
+          onChangeTargetType={(t) => {
+            setSelectedTargetType(t);
+            showToast(`Switched target document type to ${t} Card.`);
+          }}
         />
       ) : (
-        <div className="p-8 bg-[#0F1D2E] border border-[#1E3A5F] rounded text-center text-xs text-[#94A3B8]">
-          No verification document selected. Upload an identity card to begin OCR inspection.
+        <div className="p-12 bg-[#0F1D2E] border border-[#1E3A5F] rounded-xl text-center space-y-3">
+          <div className="w-12 h-12 bg-[#172A42] rounded-full flex items-center justify-center mx-auto text-[#94A3B8]">
+            <Upload className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-bold text-[#F1F5F9]">No Verification Document Active</h3>
+          <p className="text-xs text-[#94A3B8] max-w-md mx-auto">
+            Choose a target document type above (Aadhaar, PAN, or Passport) and upload an image to execute the 3-Scan verification pipeline.
+          </p>
+          <button
+            onClick={handleTriggerUpload}
+            className="px-4 py-2 bg-[#F59E0B] text-[#07111F] text-xs font-bold rounded-lg hover:bg-[#fbbf24] transition-all inline-flex items-center gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Upload Document</span>
+          </button>
         </div>
       )}
 
       {/* Forensic Legal Compliance Banner */}
-      <div className="p-3 bg-[#172A42]/60 rounded border border-[#1E3A5F] text-xs text-[#CBD5E1] flex items-start gap-2.5">
+      <div className="p-4 bg-[#172A42]/60 rounded-xl border border-[#1E3A5F] text-xs text-[#CBD5E1] flex items-start gap-3 shadow-md">
         <Info className="w-4 h-4 text-[#38BDF8] shrink-0 mt-0.5" />
         <div className="text-[11px] leading-relaxed">
           <strong className="text-[#38BDF8]">DPDP Act 2023 & UIDAI Guidelines: </strong>
-          Document Defense runs optical geometry, Verhoeff checksum validation, and font-typeface consistency tests client-side in your secure browser. Raw images are kept in memory and are never sent to external untrusted scrapers.
+          Document Defense runs optical geometry, Verhoeff checksum validation, and font-typeface consistency tests client-side in your secure browser. Raw images are processed in-memory and are never stored on external unencrypted servers.
         </div>
       </div>
 

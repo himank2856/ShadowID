@@ -141,6 +141,41 @@ export interface DocumentOcrBox {
   anomalyReason?: string;
 }
 
+export interface DocumentScanStage {
+  stageNumber: 1 | 2 | 3;
+  name: string;
+  description: string;
+  status: 'PENDING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'SKIPPED';
+  verdictMessage: string;
+  details?: {
+    expectedType?: string;
+    detectedType?: string;
+    isTypeMatch?: boolean;
+    checksumValid?: boolean;
+    checksumType?: string;
+    databaseMatch?: boolean;
+    databaseMatchDetails?: string;
+    isDuplicateDetected?: boolean;
+    duplicateCount?: number;
+    duplicateMatches?: Array<{
+      source: string;
+      identityNumberOrName: string;
+      associatedProfile?: string;
+      riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      details: string;
+    }>;
+  };
+}
+
+export interface ThreeStageVerificationResult {
+  expectedCategory: 'Aadhaar' | 'PAN' | 'Passport';
+  detectedCategory: 'Aadhaar' | 'PAN' | 'Passport' | 'Generic ID' | 'Unknown';
+  overallStatus: 'PASSED' | 'FAILED' | 'HALTED_TYPE_MISMATCH';
+  stage1TypeCheck: DocumentScanStage;
+  stage2AuthenticityCheck: DocumentScanStage;
+  stage3DuplicateCheck: DocumentScanStage;
+}
+
 export interface DocumentAnalysisData {
   id: string;
   documentCategory: 'Aadhaar' | 'PAN' | 'Passport' | 'Generic ID';
@@ -166,6 +201,7 @@ export interface DocumentAnalysisData {
   inconsistencies: string[];
   humanReviewNotes?: string;
   isHumanVerified: boolean;
+  threeStageVerification?: ThreeStageVerificationResult;
 }
 
 export interface ResearchClaim {

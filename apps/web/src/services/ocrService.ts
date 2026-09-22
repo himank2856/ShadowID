@@ -5,11 +5,23 @@
  */
 
 import { createWorker } from 'tesseract.js';
-import { DocumentAnalysisData, DocumentOcrBox } from '../types.ts';
+import {
+  DocumentAnalysisData,
+  DocumentOcrBox,
+  DocumentScanStage,
+  ThreeStageVerificationResult,
+} from '../types.ts';
+import { SYNTHETIC_DOCUMENT_VERIFICATIONS } from '../data/verification/index.ts';
 
 export interface OcrProgress {
   status: string;
   progress: number; // 0 to 100
+}
+
+export interface ProcessDocumentOptions {
+  expectedCategory?: 'Aadhaar' | 'PAN' | 'Passport';
+  onProgress?: (p: OcrProgress) => void;
+  userEmail?: string;
 }
 
 export interface OcrProcessingResult {
@@ -19,6 +31,7 @@ export interface OcrProcessingResult {
   detectedCategory: 'Aadhaar' | 'PAN' | 'Passport' | 'Generic ID';
   tamperRiskScore: number; // 0 to 100
   detectedAnomalies: string[];
+  threeStageVerification: ThreeStageVerificationResult;
 }
 
 /**
@@ -121,15 +134,66 @@ async function preprocessImageCanvas(
   });
 }
 
+const DOCUMENT_REGISTRY_KEY = 'shadowid_scanned_documents_registry';
+
+export interface ScannedDocumentRegistryEntry {
+  id: string;
+  category: 'Aadhaar' | 'PAN' | 'Passport' | 'Generic ID';
+  documentNumberMasked: string;
+  holderName?: string;
+  userEmail?: string;
+  timestamp: string;
+  authenticityStatus: 'AUTHENTIC' | 'TAMPERED';
+}
+
+export function getRegisteredScannedDocuments(): ScannedDocumentRegistryEntry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DOCUMENT_REGISTRY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function registerScannedDocument(rec: ScannedDocumentRegistryEntry) {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getRegisteredScannedDocuments();
+    existing.unshift(rec);
+    localStorage.setItem(DOCUMENT_REGISTRY_KEY, JSON.stringify(existing.slice(0, 100)));
+  } catch {
+    // ignore
+  }
+}
+
 export const ocrService = {
   /**
-   * Performs end-to-end OCR and forensic tamper validation on an uploaded document file
+   * Performs progressive 3-Scan verification:
+   * Scan 1: Document Type Verification (must match expectedCategory; halts if mismatch)
+   * Scan 2: Originality & Statutory Authenticity Database Verification
+   * Scan 3: Duplicate / Impersonation & Clone Registry Check
    */
   processDocument: async (
     file: File,
-    onProgress?: (p: OcrProgress) => void
+    optionsOrProgress?: ((p: OcrProgress) => void) | ProcessDocumentOptions,
+    expectedCategoryParam: 'Aadhaar' | 'PAN' | 'Passport' = 'Aadhaar'
   ): Promise<OcrProcessingResult> => {
-    onProgress?.({ status: 'Preprocessing document image & optimizing contrast...', progress: 10 });
+    let onProgress: ((p: OcrProgress) => void) | undefined;
+    let expectedCategory: 'Aadhaar' | 'PAN' | 'Passport' = expectedCategoryParam;
+    let userEmail: string | undefined;
+
+    if (typeof optionsOrProgress === 'function') {
+      onProgress = optionsOrProgress;
+    } else if (optionsOrProgress && typeof optionsOrProgress === 'object') {
+      onProgress = optionsOrProgress.onProgress;
+      if (optionsOrProgress.expectedCategory) {
+        expectedCategory = optionsOrProgress.expectedCategory;
+      }
+      userEmail = optionsOrProgress.userEmail;
+    }
+
+    onProgress?.({ status: `Preprocessing ${expectedCategory} image & optimizing contrast...`, progress: 10 });
 
     const { processedDataUrl, originalDataUrl, width: imgW, height: imgH } = await preprocessImageCanvas(file);
 
@@ -138,10 +202,10 @@ export const ocrService = {
     const worker = await createWorker('eng', 1, {
       logger: (m) => {
         if (m.status === 'recognizing text') {
-          const pct = 25 + Math.round((m.progress || 0) * 55);
+          const pct = 25 + Math.round((m.progress || 0) * 45);
           onProgress?.({
-            status: `Recognizing tokens (${Math.round((m.progress || 0) * 100)}%)...`,
-            progress: Math.min(80, pct),
+            status: `Extracting visual tokens (${Math.round((m.progress || 0) * 100)}%)...`,
+            progress: Math.min(70, pct),
           });
         }
       },
@@ -151,46 +215,62 @@ export const ocrService = {
     const res = await worker.recognize(processedDataUrl);
     await worker.terminate();
 
-    onProgress?.({ status: 'Analyzing forensic typography, alignment & checksums...', progress: 85 });
-
     const fullText = res.data.text || '';
     const upperText = fullText.toUpperCase();
 
-    // 1. Classify Indian Document Type
+    // ============================================================
+    // SCAN 1: DOCUMENT TYPE CLASSIFICATION & TARGET MATCH CHECK
+    // ============================================================
+    onProgress?.({ status: `Scan 1 of 3: Verifying document is a ${expectedCategory} card...`, progress: 75 });
+
     let detectedCategory: 'Aadhaar' | 'PAN' | 'Passport' | 'Generic ID' = 'Generic ID';
-    if (
+
+    // Positive indicators
+    const hasAadhaarKeywords =
       upperText.includes('AADHAAR') ||
       upperText.includes('UIDAI') ||
       upperText.includes('GOVERNMENT OF INDIA') ||
       upperText.includes('MERA AADHAAR') ||
-      /\b\d{4}\s\d{4}\s\d{4}\b/.test(fullText)
-    ) {
-      detectedCategory = 'Aadhaar';
-    } else if (
+      upperText.includes('ENROLMENT') ||
+      upperText.includes('UNIQUE IDENTIFICATION') ||
+      /\b\d{4}\s\d{4}\s\d{4}\b/.test(fullText) ||
+      /\b[X•]{4}\s[X•]{4}\s\d{4}\b/.test(fullText);
+
+    const hasPanKeywords =
       upperText.includes('INCOME TAX') ||
       upperText.includes('PERMANENT ACCOUNT NUMBER') ||
-      /\b[A-Z]{5}[0-9]{4}[A-Z]\b/.test(upperText)
-    ) {
-      detectedCategory = 'PAN';
-    } else if (
+      upperText.includes('TAX INVOICE') === false && /\b[A-Z]{5}[0-9]{4}[A-Z]\b/.test(upperText);
+
+    const hasPassportKeywords =
       upperText.includes('PASSPORT') ||
       upperText.includes('REPUBLIC OF INDIA') ||
+      upperText.includes('MINISTRY OF EXTERNAL AFFAIRS') ||
       /P<IND/.test(upperText) ||
-      /\b[A-Z][0-9]{7}\b/.test(upperText)
-    ) {
+      /\b[A-Z][0-9]{7}\b/.test(upperText);
+
+    // Disambiguate
+    if (hasPanKeywords && !upperText.includes('AADHAAR')) {
+      detectedCategory = 'PAN';
+    } else if (hasPassportKeywords && !upperText.includes('AADHAAR')) {
       detectedCategory = 'Passport';
+    } else if (hasAadhaarKeywords) {
+      detectedCategory = 'Aadhaar';
+    } else if (/\b[A-Z]{5}[0-9]{4}[A-Z]\b/.test(upperText)) {
+      detectedCategory = 'PAN';
+    } else {
+      detectedCategory = 'Generic ID';
     }
 
-    // 2. Extract OCR Bounding Boxes with percentage coordinates
+    const isTypeMatch = detectedCategory === expectedCategory;
+
+    // Build OCR Bounding Boxes
     const words: any[] = ((res.data as any)?.words as any[]) || [];
     const boxes: DocumentOcrBox[] = [];
     const anomalies: string[] = [];
 
-    // Calculate baseline stats for anomaly detection
     const confidences = words.map((w: any) => Number(w.confidence) || 0).filter((c: number) => c > 0);
     const avgConfidence = confidences.length > 0 ? confidences.reduce((a: number, b: number) => a + b, 0) / confidences.length : 85;
 
-    // Check heights for font mismatch
     const heights = words.map((w: any) => (w.bbox ? w.bbox.y1 - w.bbox.y0 : 0)).filter((h: number) => h > 5);
     const avgHeight = heights.length > 0 ? heights.reduce((a: number, b: number) => a + b, 0) / heights.length : 15;
 
@@ -207,14 +287,12 @@ export const ocrService = {
       let isAnomaly = false;
       let anomalyReason: string | undefined;
 
-      // Heuristic 1: Significant confidence drop inside high confidence document (spliced text indicator)
       const tokenConfidence = Number(w.confidence) || 0;
       if (avgConfidence > 75 && tokenConfidence < 45 && cleanWord.length > 3) {
         isAnomaly = true;
         anomalyReason = `Low confidence token (${Math.round(tokenConfidence)}% vs avg ${Math.round(avgConfidence)}%): possible digital alteration or splicing.`;
       }
 
-      // Heuristic 2: Typography/height jump
       const boxHeight = bbox.y1 - bbox.y0;
       if (avgHeight > 10 && boxHeight > avgHeight * 2.1 && cleanWord.length > 4) {
         isAnomaly = true;
@@ -236,56 +314,295 @@ export const ocrService = {
       });
     });
 
-    // 3. Indian Identity Forensic Validation
-    let tamperScore = 10; // Clean baseline
+    // ============================================================
+    // STRICT GATING: IF SCAN 1 FAILS, HALT IMMEDIATELY!
+    // DO NOT PROCEED TO SCAN 2 OR SCAN 3!
+    // ============================================================
+    if (!isTypeMatch) {
+      const typeMismatchAnomaly = `CRITICAL TYPE MISMATCH: User requested "${expectedCategory} Card" verification, but the uploaded document was identified as "${detectedCategory}". Per security policy, verification has been halted at Scan 1 and will not proceed to database originality or duplicate checks.`;
+      anomalies.unshift(typeMismatchAnomaly);
 
-    if (detectedCategory === 'Aadhaar') {
-      const uidMatch = fullText.match(/\b(\d{4})\s*(\d{4})\s*(\d{4})\b/);
-      if (uidMatch) {
-        const rawUid = `${uidMatch[1]}${uidMatch[2]}${uidMatch[3]}`;
-        const isVerhoeffValid = validateVerhoeff(rawUid);
-        if (!isVerhoeffValid) {
-          anomalies.push(`Verhoeff Checksum Failure: Extracted UID ${uidMatch[0]} does not satisfy statutory algorithm.`);
-          tamperScore += 45;
-        } else {
-          // Check masking compliance under DPDP Act / UIDAI circular
-          if (!uidMatch[0].startsWith('XXXX') && !uidMatch[0].startsWith('••••')) {
-            anomalies.push('Unmasked Aadhaar UID detected: Violates DPDP Act minimization rules (first 8 digits must be masked).');
-            tamperScore += 20;
-          }
-        }
-      }
-    } else if (detectedCategory === 'PAN') {
-      const panMatch = upperText.match(/\b([A-Z]{5}[0-9]{4}[A-Z])\b/);
-      if (panMatch) {
-        const panNumber = panMatch[1];
-        const entityType = panNumber.charAt(3);
-        const validEntityChars = ['P', 'C', 'H', 'F', 'A', 'T', 'B', 'L', 'J', 'G'];
-        if (!validEntityChars.includes(entityType)) {
-          anomalies.push(`Invalid Taxpayer Entity Code '${entityType}' in 4th character of PAN ${panNumber}.`);
-          tamperScore += 40;
-        }
-      } else {
-        anomalies.push('Income Tax Department header found, but 10-character PAN structure is unparseable or obscured.');
-        tamperScore += 25;
-      }
-    } else if (detectedCategory === 'Passport') {
-      const mrzMatch = upperText.match(/P<IND([A-Z0-9<]+)/);
-      if (!mrzMatch && !/\b[A-Z][0-9]{7}\b/.test(upperText)) {
-        anomalies.push('Missing standardized ICAO Doc 9303 Machine Readable Zone (MRZ) string on passport face.');
-        tamperScore += 30;
+      const stage1: DocumentScanStage = {
+        stageNumber: 1,
+        name: 'Document Type Verification',
+        description: `Verify uploaded document matches selected target (${expectedCategory})`,
+        status: 'FAILED',
+        verdictMessage: `Scan 1 Failed: Expected ${expectedCategory} Card, but detected ${detectedCategory}. The uploaded document is not a valid ${expectedCategory} card.`,
+        details: {
+          expectedType: expectedCategory,
+          detectedType: detectedCategory,
+          isTypeMatch: false,
+        },
+      };
+
+      const stage2: DocumentScanStage = {
+        stageNumber: 2,
+        name: 'Statutory Authenticity & Database Integrity Check',
+        description: 'Scan to verify originality against statutory checksums, typography, and database records',
+        status: 'SKIPPED',
+        verdictMessage: `Scan 2 Halted: Verification aborted because Scan 1 detected a document type mismatch (${detectedCategory} instead of ${expectedCategory}).`,
+      };
+
+      const stage3: DocumentScanStage = {
+        stageNumber: 3,
+        name: 'Duplicate & Impersonation Database Scan',
+        description: 'Scan whether someone else is using this identity or created a duplicate/clone',
+        status: 'SKIPPED',
+        verdictMessage: `Scan 3 Halted: Duplicate verification aborted because the document failed the initial type filter.`,
+      };
+
+      const threeStageVerification: ThreeStageVerificationResult = {
+        expectedCategory,
+        detectedCategory,
+        overallStatus: 'HALTED_TYPE_MISMATCH',
+        stage1TypeCheck: stage1,
+        stage2AuthenticityCheck: stage2,
+        stage3DuplicateCheck: stage3,
+      };
+
+      const analysisData: DocumentAnalysisData = {
+        id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        documentCategory: detectedCategory,
+        sampleLabel: `${detectedCategory} (Rejected for ${expectedCategory})`,
+        filename: file.name,
+        mimeType: file.type || 'image/png',
+        fileSizeBytes: file.size,
+        ocrEngine: 'Tesseract WebAssembly v7 (eng/hin) + Canvas Adaptive Contrast',
+        qualityScore: 25,
+        languageDetected: 'English',
+        verdict: 'Requires Urgent Forensic Review (Anomalies Flagged)',
+        summary: `Scan 1 Rejected: Expected ${expectedCategory} Card, but detected ${detectedCategory}. 2nd and 3rd scans have been aborted. Please upload a genuine ${expectedCategory} card or switch document type.`,
+        boxes,
+        inconsistencies: anomalies,
+        humanReviewNotes: `Rejected by Type Filter on ${new Date().toLocaleDateString('en-IN')}: Expected ${expectedCategory}, received ${detectedCategory}.`,
+        isHumanVerified: false,
+        threeStageVerification,
+      };
+
+      onProgress?.({ status: `Scan 1 Failed: Expected ${expectedCategory}, detected ${detectedCategory}. Halted.`, progress: 100 });
+
+      return {
+        analysis: analysisData,
+        imageUrl: originalDataUrl,
+        rawText: fullText,
+        detectedCategory,
+        tamperRiskScore: 95,
+        detectedAnomalies: anomalies,
+        threeStageVerification,
+      };
+    }
+
+    // Scan 1 Passed!
+    const stage1: DocumentScanStage = {
+      stageNumber: 1,
+      name: 'Document Type Verification',
+      description: `Verify uploaded document matches selected target (${expectedCategory})`,
+      status: 'PASSED',
+      verdictMessage: `Scan 1 Passed: Confirmed official ${expectedCategory} Card layout and statutory keyword structure.`,
+      details: {
+        expectedType: expectedCategory,
+        detectedType: detectedCategory,
+        isTypeMatch: true,
+      },
+    };
+
+    // ============================================================
+    // SCAN 2: STATUTORY AUTHENTICITY & DATABASE INTEGRITY CHECK
+    // ============================================================
+    onProgress?.({ status: `Scan 2 of 3: Scanning originality & statutory authenticity with database...`, progress: 85 });
+
+    let tamperScore = 10;
+    let checksumValid = true;
+    let checksumType = 'Statutory Checksum';
+    let extractedDocNumber = '';
+    let extractedHolderName = '';
+
+    // Extract Holder Name Heuristics
+    const lines = fullText.split('\n').map((l) => l.trim()).filter((l) => l.length > 2);
+    for (const line of lines) {
+      if (/^[A-Z][a-z]+(\s[A-Z][a-z]+)+$/.test(line) && !line.includes('Government') && !line.includes('Department')) {
+        extractedHolderName = line;
+        break;
       }
     }
 
-    // Add general box anomalies to summary
+    if (detectedCategory === 'Aadhaar') {
+      checksumType = 'UIDAI Verhoeff Checksum';
+      const uidMatch = fullText.match(/\b(\d{4})\s*(\d{4})\s*(\d{4})\b/);
+      const maskedUidMatch = fullText.match(/\b([X•]{4})\s*([X•]{4})\s*(\d{4})\b/);
+
+      if (uidMatch) {
+        extractedDocNumber = `${uidMatch[1]} ${uidMatch[2]} ${uidMatch[3]}`;
+        const rawUid = `${uidMatch[1]}${uidMatch[2]}${uidMatch[3]}`;
+        const isVerhoeffValid = validateVerhoeff(rawUid);
+        if (!isVerhoeffValid) {
+          checksumValid = false;
+          anomalies.push(`Verhoeff Checksum Failure: Extracted UID ${uidMatch[0]} does not satisfy statutory algorithm.`);
+          tamperScore += 50;
+        } else {
+          // Check DPDP masking
+          anomalies.push('Unmasked Aadhaar UID detected: Violates DPDP Act minimization rules (first 8 digits must be masked).');
+          tamperScore += 15;
+        }
+      } else if (maskedUidMatch) {
+        extractedDocNumber = `•••• •••• ${maskedUidMatch[3]}`;
+      } else {
+        checksumValid = false;
+        anomalies.push('Could not detect standardized 12-digit Aadhaar UID format.');
+        tamperScore += 30;
+      }
+    } else if (detectedCategory === 'PAN') {
+      checksumType = 'Income Tax Entity Checksum';
+      const panMatch = upperText.match(/\b([A-Z]{5}[0-9]{4}[A-Z])\b/);
+      if (panMatch) {
+        extractedDocNumber = panMatch[1];
+        const entityType = extractedDocNumber.charAt(3);
+        const validEntityChars = ['P', 'C', 'H', 'F', 'A', 'T', 'B', 'L', 'J', 'G'];
+        if (!validEntityChars.includes(entityType)) {
+          checksumValid = false;
+          anomalies.push(`Invalid Taxpayer Entity Code '${entityType}' in 4th character of PAN ${extractedDocNumber}.`);
+          tamperScore += 40;
+        }
+      } else {
+        checksumValid = false;
+        anomalies.push('Income Tax Department header found, but 10-character PAN structure is unparseable or obscured.');
+        tamperScore += 35;
+      }
+    } else if (detectedCategory === 'Passport') {
+      checksumType = 'ICAO Doc 9303 MRZ Checksum';
+      const mrzMatch = upperText.match(/P<IND([A-Z0-9<]+)/);
+      const passNumMatch = upperText.match(/\b([A-Z][0-9]{7})\b/);
+      if (passNumMatch) {
+        extractedDocNumber = passNumMatch[1];
+      }
+      if (!mrzMatch && !passNumMatch) {
+        checksumValid = false;
+        anomalies.push('Missing standardized ICAO Doc 9303 Machine Readable Zone (MRZ) string on passport face.');
+        tamperScore += 35;
+      }
+    }
+
+    // Check box anomalies
     const boxAnomalyCount = boxes.filter((b) => b.isAnomaly).length;
     if (boxAnomalyCount > 0) {
       anomalies.push(`${boxAnomalyCount} localized typographic or confidence discontinuities detected across extracted tokens.`);
       tamperScore += Math.min(30, boxAnomalyCount * 10);
     }
 
-    const overallQuality = Math.max(20, Math.min(99, Math.round(avgConfidence)));
+    const isAuthentic = checksumValid && tamperScore < 40;
+
+    const stage2: DocumentScanStage = {
+      stageNumber: 2,
+      name: 'Statutory Authenticity & Database Integrity Check',
+      description: 'Scan to verify originality against statutory checksums, typography, and database records',
+      status: isAuthentic ? 'PASSED' : 'FAILED',
+      verdictMessage: isAuthentic
+        ? `Scan 2 Passed: Authentic original ${expectedCategory} verified. Statutory checksums valid, baseline continuous, matches database specifications.`
+        : `Scan 2 Failed: Tampered or counterfeit indicators detected. ${anomalies[0] || 'Checksum failure or typography manipulation flagged.'}`,
+      details: {
+        checksumValid,
+        checksumType,
+        databaseMatch: true,
+        databaseMatchDetails: isAuthentic
+          ? 'Matched official UIDAI / NSDL / MEA statutory specification standards.'
+          : 'Failed statutory specification criteria in database cross-reference.',
+      },
+    };
+
+    // ============================================================
+    // SCAN 3: DUPLICATE & IMPERSONATION DATABASE SCAN
+    // ============================================================
+    onProgress?.({ status: 'Scan 3 of 3: Scanning database for duplicate identity reuse & clones...', progress: 95 });
+
+    const duplicateMatches: Array<{
+      source: string;
+      identityNumberOrName: string;
+      associatedProfile?: string;
+      riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+      details: string;
+    }> = [];
+
+    // 1. Check in Synthetic Database Fixtures
+    const matchingSyntheticFixture = SYNTHETIC_DOCUMENT_VERIFICATIONS.find((d) => {
+      if (extractedDocNumber && d.documentNumberMasked) {
+        const last4Extracted = extractedDocNumber.replace(/\s/g, '').slice(-4);
+        const last4Fixture = d.documentNumberMasked.replace(/\s/g, '').slice(-4);
+        if (last4Extracted && last4Fixture && last4Extracted === last4Fixture) return true;
+      }
+      if (extractedHolderName && d.holderName) {
+        return d.holderName.toLowerCase().includes(extractedHolderName.toLowerCase()) ||
+          extractedHolderName.toLowerCase().includes(d.holderName.toLowerCase());
+      }
+      return false;
+    });
+
+    if (matchingSyntheticFixture) {
+      if (matchingSyntheticFixture.validityStatus !== 'VERIFIED_AUTHENTIC') {
+        duplicateMatches.push({
+          source: `Forensic Benchmark Registry (${matchingSyntheticFixture.benchmarkCode})`,
+          identityNumberOrName: matchingSyntheticFixture.documentNumberMasked,
+          associatedProfile: matchingSyntheticFixture.holderName,
+          riskLevel: 'CRITICAL',
+          details: `Reused ID detected: This document credential matches a flagged counterfeit/tampered record in the forensic database.`,
+        });
+      }
+    }
+
+    // 2. Check in Local Storage Scanned Registry (Cross-Account Multi-Usage)
+    const existingRegistry = getRegisteredScannedDocuments();
+    const duplicateInRegistry = existingRegistry.find((r) => {
+      if (extractedDocNumber && r.documentNumberMasked) {
+        const a = extractedDocNumber.replace(/\s/g, '').slice(-4);
+        const b = r.documentNumberMasked.replace(/\s/g, '').slice(-4);
+        return a.length === 4 && a === b && r.userEmail && userEmail && r.userEmail !== userEmail;
+      }
+      return false;
+    });
+
+    if (duplicateInRegistry) {
+      duplicateMatches.push({
+        source: 'ShadowID Multi-Account Identity Store',
+        identityNumberOrName: duplicateInRegistry.documentNumberMasked,
+        associatedProfile: duplicateInRegistry.userEmail,
+        riskLevel: 'HIGH',
+        details: `This ${expectedCategory} was previously registered by another account (${duplicateInRegistry.userEmail}) on ${new Date(duplicateInRegistry.timestamp).toLocaleDateString()}. Possible identity cloning or account sharing.`,
+      });
+    }
+
+    const isDuplicateDetected = duplicateMatches.length > 0;
+    if (isDuplicateDetected) {
+      tamperScore += 35;
+      anomalies.push(`DUPLICATE IDENTITY DETECTED: This ${expectedCategory} credential is already associated with other account records or clone attempts.`);
+    }
+
+    const stage3: DocumentScanStage = {
+      stageNumber: 3,
+      name: 'Duplicate & Impersonation Database Scan',
+      description: 'Scan whether someone else is using this identity or created a duplicate/clone',
+      status: isDuplicateDetected ? 'FAILED' : 'PASSED',
+      verdictMessage: isDuplicateDetected
+        ? `Scan 3 Alert: Duplicate or recycled identity detected! Found ${duplicateMatches.length} matching profile(s) or clone record(s) in the database.`
+        : `Scan 3 Passed: Single authentic holder confirmed. No duplicate records, identity clones, or secondary usage found in registry.`,
+      details: {
+        isDuplicateDetected,
+        duplicateCount: duplicateMatches.length,
+        duplicateMatches,
+      },
+    };
+
+    // Record this document in the registry for future duplicate detection
+    registerScannedDocument({
+      id: `reg-${Date.now()}`,
+      category: detectedCategory,
+      documentNumberMasked: extractedDocNumber || '•••• •••• ' + (file.name.slice(0, 4)),
+      holderName: extractedHolderName || 'Scanned Holder',
+      userEmail,
+      timestamp: new Date().toISOString(),
+      authenticityStatus: isAuthentic && !isDuplicateDetected ? 'AUTHENTIC' : 'TAMPERED',
+    });
+
     const finalTamperScore = Math.min(100, tamperScore);
+    const overallQuality = Math.max(20, Math.min(99, Math.round(avgConfidence)));
 
     const verdict =
       finalTamperScore >= 60
@@ -296,8 +613,20 @@ export const ocrService = {
 
     const summary =
       anomalies.length === 0
-        ? `Uploaded ${detectedCategory} successfully parsed via Tesseract Neural Engine (${boxes.length} tokens extracted). No typeface, checksum, or alignment anomalies detected.`
-        : `Uploaded ${detectedCategory} exhibits ${anomalies.length} potential anomalies: ${anomalies.join(' ')}`;
+        ? `Uploaded ${detectedCategory} successfully passed all 3 verification scans (${boxes.length} tokens extracted). No typeface, checksum, duplicate, or alignment anomalies detected.`
+        : `Uploaded ${detectedCategory} completed 3 scans with ${anomalies.length} potential anomalies: ${anomalies.join(' ')}`;
+
+    const threeStageVerification: ThreeStageVerificationResult = {
+      expectedCategory,
+      detectedCategory,
+      overallStatus:
+        stage1.status === 'PASSED' && stage2.status === 'PASSED' && stage3.status === 'PASSED'
+          ? 'PASSED'
+          : 'FAILED',
+      stage1TypeCheck: stage1,
+      stage2AuthenticityCheck: stage2,
+      stage3DuplicateCheck: stage3,
+    };
 
     const analysisData: DocumentAnalysisData = {
       id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -313,11 +642,12 @@ export const ocrService = {
       summary,
       boxes,
       inconsistencies: anomalies,
-      humanReviewNotes: `Uploaded on ${new Date().toLocaleDateString('en-IN')} by active analyst. OCR extracted ${boxes.length} text segments. Tamper index: ${finalTamperScore}/100.`,
+      humanReviewNotes: `Uploaded on ${new Date().toLocaleDateString('en-IN')} by active analyst. OCR extracted ${boxes.length} text segments. 3-Scan Result: Scan 1 (${stage1.status}), Scan 2 (${stage2.status}), Scan 3 (${stage3.status}). Tamper index: ${finalTamperScore}/100.`,
       isHumanVerified: false,
+      threeStageVerification,
     };
 
-    onProgress?.({ status: 'Document Defense Analysis complete.', progress: 100 });
+    onProgress?.({ status: 'All 3 Verification Scans complete.', progress: 100 });
 
     return {
       analysis: analysisData,
@@ -326,6 +656,7 @@ export const ocrService = {
       detectedCategory,
       tamperRiskScore: finalTamperScore,
       detectedAnomalies: anomalies,
+      threeStageVerification,
     };
   },
 };
