@@ -253,6 +253,7 @@ export interface UserAccount {
   organization?: string;
   designation?: string;
   isVerified: boolean;
+  isEmailVerified?: boolean;
   verificationMethod: 'otp_mobile' | 'otp_email' | 'none';
   verifiedAt?: string;
   isPro: boolean;

@@ -22,6 +22,7 @@ import {
   DatasetVerificationResult,
 } from '../../types.ts';
 import { datasetVerificationService } from '../../services/datasetVerificationService.ts';
+import { ProjectDataAnalytics } from '../../components/ProjectDataAnalytics.tsx';
 import {
   Shield,
   FileCheck2,
@@ -42,12 +43,13 @@ import {
   Fingerprint,
   Info,
   Layers,
+  BarChart3,
 } from 'lucide-react';
 
 export const VerificationPage: React.FC = () => {
   const { addNewScan, showToast, navigate } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'datasetVerification' | 'documents' | 'impersonation' | 'exposure'>('datasetVerification');
+  const [activeTab, setActiveTab] = useState<'datasetVerification' | 'analytics' | 'documents' | 'impersonation' | 'exposure'>('datasetVerification');
   const [selectedDocId, setSelectedDocId] = useState<string>(SYNTHETIC_DOCUMENT_VERIFICATIONS[0].id);
   const [selectedImpId, setSelectedImpId] = useState<string>(SYNTHETIC_IMPERSONATION_VERIFICATIONS[0].id);
   const [selectedExpId, setSelectedExpId] = useState<string>(SYNTHETIC_EXPOSURE_VERIFICATIONS[0].id);
@@ -174,6 +176,21 @@ export const VerificationPage: React.FC = () => {
           <span>Live Account Verifier</span>
           <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#A3E635]/20 text-[#A3E635] font-mono-code">
             Project Data (25k+)
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`flex-1 py-2.5 px-3 rounded text-xs font-mono-code font-bold flex items-center justify-center gap-1.5 transition-all min-w-[170px] ${
+            activeTab === 'analytics'
+              ? 'bg-[#172A42] text-[#38BDF8] border border-[#38BDF8]/40 shadow-[0_0_10px_rgba(56,189,248,0.15)]'
+              : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-[#38BDF8]" />
+          <span>Graphical Analytics</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#38BDF8]/20 text-[#38BDF8] font-mono-code">
+            Charts
           </span>
         </button>
 
@@ -651,6 +668,31 @@ export const VerificationPage: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Interactive Graphical Benchmark & Scatter Plot Suite */}
+          <div className="pt-2">
+            <ProjectDataAnalytics
+              onSelectCandidateForVerification={(h, n) => {
+                setQueryHandle(h);
+                setQueryName(n);
+                handleRunVerification(h, n);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TAB CONTENT: GRAPHICAL ANALYTICS SUITE */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-4">
+          <ProjectDataAnalytics
+            onSelectCandidateForVerification={(h, n) => {
+              setQueryHandle(h);
+              setQueryName(n);
+              setActiveTab('datasetVerification');
+              handleRunVerification(h, n);
+            }}
+          />
         </div>
       )}
 

@@ -88,33 +88,79 @@ export const otpService = {
     const purposeText =
       purpose === 'reset_password'
         ? 'password reset'
-        : purpose === 'signup'
-        ? 'account creation'
-        : 'forensic access authentication';
+        : purpose === 'login'
+        ? 'secure authentication'
+        : 'analyst account activation';
+
+    // Store simulated outbox message for immediate inspection in dev & UI preview
+    if (channel === 'email') {
+      try {
+        const INBOX_KEY = 'shadowid_simulated_inbox';
+        const rawInbox = localStorage.getItem(INBOX_KEY);
+        const inbox = rawInbox ? JSON.parse(rawInbox) : [];
+        const emailMessage = {
+          id: `msg_${Date.now()}`,
+          recipient: cleanTarget,
+          sender: 'security@shadowid.in',
+          senderName: 'ShadowID Identity Defense Center',
+          subject: `[Action Required] Verify your ShadowID Analyst Account (${purposeText.toUpperCase()})`,
+          code: randomCode,
+          purpose,
+          timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          expiresInSeconds: 300,
+          magicLinkUrl: `${window.location.origin}/app/settings?action=verify_email&token=${record.id}&code=${randomCode}`,
+        };
+        inbox.unshift(emailMessage);
+        localStorage.setItem(INBOX_KEY, JSON.stringify(inbox.slice(0, 10)));
+      } catch {
+        // Fallback for SSR or non-DOM
+      }
+    }
 
     return {
       success: true,
       target: cleanTarget,
       channel,
       otpCodePreview: randomCode,
-      expiresInSeconds: Math.floor(OTP_TTL_MS / 1000),
-      message: `6-digit OTP for ${purposeText} dispatched to ${target}. (Code: ${randomCode})`,
+      expiresInSeconds: 300,
+      message: `Security verification OTP dispatched to ${cleanTarget} via ${serviceLabel}.`,
     };
   },
 
   /**
-   * Verifies the provided 6-digit code against target
+   * Retrieves the most recent simulated email dispatched to an address or generally
    */
-  verifyOtp: (target: string, codeInput: string): VerifyOtpResult => {
+  getLatestEmailMessage: (recipient?: string) => {
+    try {
+      const INBOX_KEY = 'shadowid_simulated_inbox';
+      const rawInbox = localStorage.getItem(INBOX_KEY);
+      if (!rawInbox) return null;
+      const inbox = JSON.parse(rawInbox);
+      if (!Array.isArray(inbox) || inbox.length === 0) return null;
+      if (recipient) {
+        const clean = recipient.trim().toLowerCase();
+        return inbox.find((m: any) => m.recipient === clean) || inbox[0];
+      }
+      return inbox[0];
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Validates submitted OTP against in-memory/localStorage records
+   */
+  verifyOtp: (target: string, code: string): VerifyOtpResult => {
     const cleanTarget = target.trim().toLowerCase();
-    const cleanCode = codeInput.trim();
+    const cleanCode = code.trim();
+
     const otps = loadStoredOtps();
     const record = otps[cleanTarget];
 
     if (!record || record.isUsed) {
       return {
         success: false,
-        message: 'No active OTP verification session found for this contact.',
+        message: 'No active OTP found for this address. Please request a new code.',
         error: 'NOT_FOUND',
       };
     }

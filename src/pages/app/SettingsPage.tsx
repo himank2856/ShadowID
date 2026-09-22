@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext.tsx';
 import { accountDatabase } from '../../services/accountDatabase.ts';
+import { otpService } from '../../services/otpService.ts';
 import { supabaseService, SupabaseConfig, DEFAULT_SUPABASE_ACCOUNT } from '../../services/supabaseService.ts';
 import {
   Settings,
@@ -25,6 +26,7 @@ import {
   Loader2,
   RefreshCw,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { BillingModal } from '../../components/BillingModal.tsx';
 import { formatINR } from '../../utils/formatters.ts';
@@ -32,8 +34,52 @@ import { paymentProtocolService } from '../../services/paymentProtocolService.ts
 import { PaymentReceipt } from '../../types.ts';
 
 export const SettingsPage: React.FC = () => {
-  const { billing, user, logout, showToast, navigate } = useApp();
+  const { billing, user, logout, showToast, navigate, refreshUser } = useApp();
   const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+
+  // Email Verification State
+  const [isEmailVerifyModalOpen, setIsEmailVerifyModalOpen] = useState(false);
+  const [emailOtpDigits, setEmailOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [emailOtpPreview, setEmailOtpPreview] = useState<string | null>(null);
+  const [emailOtpCountdown, setEmailOtpCountdown] = useState<number>(30);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState<boolean>(false);
+  const [emailVerifyError, setEmailVerifyError] = useState<string | null>(null);
+
+  const handleInitiateEmailVerification = () => {
+    if (!user) return;
+    setEmailVerifyError(null);
+    const res = otpService.sendEmailOtp(user.email, 'signup');
+    setEmailOtpPreview(res.otpCodePreview);
+    setEmailOtpCountdown(30);
+    setEmailOtpDigits(['', '', '', '', '', '']);
+    setIsEmailVerifyModalOpen(true);
+    showToast(`Verification OTP dispatched to ${user.email}`);
+  };
+
+  const handleConfirmEmailVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setEmailVerifyError(null);
+    const code = emailOtpDigits.join('');
+    if (code.length !== 6) {
+      setEmailVerifyError('Please enter all 6 digits of the OTP code.');
+      return;
+    }
+    setIsVerifyingEmail(true);
+    try {
+      const res = await accountDatabase.verifyUserEmail(user.id, user.email, code);
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+      refreshUser();
+      setIsEmailVerifyModalOpen(false);
+      showToast('Work email successfully verified with cryptographic OTP!');
+    } catch (err: any) {
+      setEmailVerifyError(err.message || 'Email verification failed.');
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  };
 
   // Supabase State (Account: himank2856)
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>(() => supabaseService.getConfig());
@@ -225,11 +271,33 @@ export const SettingsPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
             <div className="p-3 bg-[#07111F] rounded border border-[#1E3A5F] space-y-1">
-              <div className="text-[10px] font-mono-code text-[#64748B] uppercase flex items-center gap-1">
-                <Mail className="w-3 h-3" /> Work Email
+              <div className="text-[10px] font-mono-code text-[#64748B] uppercase flex items-center justify-between">
+                <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> Work Email</span>
+                {user.isEmailVerified ? (
+                  <span className="text-[10px] text-[#A3E635] bg-[#A3E635]/10 px-1.5 py-0.5 rounded border border-[#A3E635]/30">Verified</span>
+                ) : (
+                  <span className="text-[10px] text-[#F59E0B] bg-[#F59E0B]/10 px-1.5 py-0.5 rounded border border-[#F59E0B]/30">Unverified</span>
+                )}
               </div>
               <div className="text-[#F1F5F9] font-mono-code truncate">{user.email}</div>
-              <div className="text-[10px] text-[#A3E635]">Verified in Account DB</div>
+              {user.isEmailVerified ? (
+                <div className="text-[10px] text-[#A3E635] flex items-center gap-1 font-semibold">
+                  <CheckCircle2 className="w-3 h-3" /> Verified (DPDP Compliant)
+                </div>
+              ) : (
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-[#F59E0B] flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Verification Pending
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleInitiateEmailVerification}
+                    className="text-[10px] font-mono-code px-2 py-0.5 rounded bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40 hover:bg-[#38BDF8]/30 transition-colors"
+                  >
+                    Verify Email
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="p-3 bg-[#07111F] rounded border border-[#1E3A5F] space-y-1">
@@ -563,6 +631,132 @@ export const SettingsPage: React.FC = () => {
           Revoke Consent & Purge Data
         </button>
       </div>
+
+      {/* Email Verification OTP Modal */}
+      {isEmailVerifyModalOpen && user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050C15]/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#0F1D2E] border border-[#1E3A5F] rounded-lg w-full max-w-md shadow-2xl overflow-hidden animate-scale-up">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#1E3A5F] bg-[#07111F]/50">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded bg-[#38BDF8]/20 border border-[#38BDF8]/50 flex items-center justify-center text-[#38BDF8]">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-display font-bold text-[#F1F5F9]">
+                    Verify Work Email Address
+                  </h3>
+                  <span className="text-[10px] font-mono-code text-[#94A3B8]">
+                    DPDP Section 12 Identity Attestation
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEmailVerifyModalOpen(false)}
+                className="text-[#94A3B8] hover:text-[#F1F5F9] p-1 rounded hover:bg-[#1E3A5F]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-[#94A3B8] leading-relaxed">
+                A 6-digit cryptographic verification code was dispatched to{' '}
+                <span className="text-[#38BDF8] font-mono-code font-bold">{user.email}</span>.
+              </p>
+
+              {/* Simulated Mailbox Preview */}
+              <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-[11px] border-b border-[#172A42] pb-1.5 font-mono-code text-[#38BDF8]">
+                  <span>From: security@shadowid.in</span>
+                  <span className="text-[10px] text-[#A3E635]">Encrypted TLS</span>
+                </div>
+                <div className="text-xs text-[#F1F5F9] font-medium">
+                  Subject: [Action Required] Verify your ShadowID Analyst Account
+                </div>
+                <div className="flex items-center justify-between bg-[#0F1D2E] p-2 rounded border border-[#38BDF8]/30">
+                  <span className="text-base font-mono-code font-bold tracking-widest text-[#A3E635]">
+                    {emailOtpPreview || '••••••'}
+                  </span>
+                  {emailOtpPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOtpDigits(emailOtpPreview.split(''));
+                        showToast('Verification code copied!');
+                      }}
+                      className="px-2 py-1 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] rounded text-[10px] font-mono-code flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" /> Auto-fill
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {emailVerifyError && (
+                <div className="p-2.5 rounded bg-[#EF4444]/10 border border-[#EF4444]/40 text-[#FCA5A5] text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{emailVerifyError}</span>
+                </div>
+              )}
+
+              {/* 6 Digit Input */}
+              <form onSubmit={handleConfirmEmailVerification} className="space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  {emailOtpDigits.map((d, i) => (
+                    <input
+                      key={i}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={d}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const copy = [...emailOtpDigits];
+                        copy[i] = val;
+                        setEmailOtpDigits(copy);
+                        if (val && e.target.nextElementSibling) {
+                          (e.target.nextElementSibling as HTMLInputElement).focus();
+                        }
+                      }}
+                      className="w-10 h-12 text-center text-lg font-mono-code font-bold bg-[#07111F] border border-[#1E3A5F] rounded focus:border-[#38BDF8] text-[#F1F5F9] focus:outline-none"
+                    />
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-mono-code text-[#94A3B8]">
+                  <span>Code expires in 5m</span>
+                  <button
+                    type="button"
+                    onClick={handleInitiateEmailVerification}
+                    className="text-[#38BDF8] hover:underline"
+                  >
+                    Resend Code
+                  </button>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailVerifyModalOpen(false)}
+                    className="flex-1 py-2 rounded text-xs font-mono-code bg-[#172A42] text-[#94A3B8] hover:text-[#F1F5F9] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isVerifyingEmail}
+                    className="flex-1 py-2 rounded text-xs font-mono-code font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {isVerifyingEmail ? 'Verifying...' : 'Confirm Verification'}
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       <BillingModal isOpen={isBillingModalOpen} onClose={() => setIsBillingModalOpen(false)} />
     </div>

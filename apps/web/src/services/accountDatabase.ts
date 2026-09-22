@@ -295,6 +295,7 @@ export const accountDatabase = {
       const users = loadUsers();
       users[user.email.toLowerCase()] = user;
       saveUsers(users);
+      accountDatabase.setActiveSession(user);
 
       logAuditEvent(user.id, 'OTP_VERIFIED', `Contact verified via OTP: ${target}`);
       return {
@@ -307,6 +308,51 @@ export const accountDatabase = {
     return {
       success: true,
       message: 'OTP verified successfully.',
+    };
+  },
+
+  /**
+   * Explicitly verify user's email address with 6-digit OTP
+   */
+  verifyUserEmail: (
+    userId: string,
+    email: string,
+    code: string
+  ): { success: boolean; user?: UserAccount; message: string } => {
+    const verifyRes = otpService.verifyOtp(email, code);
+    if (!verifyRes.success) {
+      return { success: false, message: verifyRes.message };
+    }
+
+    const users = loadUsers();
+    let targetUser = Object.values(users).find((u) => u.id === userId);
+    if (!targetUser) {
+      targetUser = accountDatabase.findByEmailOrPhone(email) || undefined;
+    }
+
+    if (targetUser) {
+      targetUser.email = email.trim().toLowerCase();
+      targetUser.isVerified = true;
+      targetUser.verificationMethod = 'otp_email';
+      targetUser.verifiedAt = new Date().toISOString();
+
+      users[targetUser.email.toLowerCase()] = targetUser;
+      saveUsers(users);
+      accountDatabase.setActiveSession(targetUser);
+
+      logAuditEvent(targetUser.id, 'OTP_VERIFIED', `Official Email verified via cryptographic OTP: ${email}`);
+      supabaseService.syncUser(targetUser);
+
+      return {
+        success: true,
+        user: targetUser,
+        message: `Email address ${email} successfully verified and cryptographically sealed.`,
+      };
+    }
+
+    return {
+      success: false,
+      message: 'User account not found for this verification session.',
     };
   },
 

@@ -22,6 +22,7 @@ interface AppContextType {
   closeAuthModal: () => void;
   login: (user: UserAccount) => void;
   logout: () => void;
+  refreshUser: () => void;
   role: Role;
   setRole: (role: Role) => void;
   language: Language;
@@ -108,6 +109,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveScanId('');
     showToast('Signed out of forensic workspace.');
     navigate('/');
+  };
+
+  const refreshUser = () => {
+    const active = accountDatabase.getActiveSession();
+    if (active) {
+      setUser(active);
+      setIsPro(active.isPro);
+      setRole(active.role);
+    }
   };
 
   const showToast = (msg: string) => {
@@ -259,6 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeAuthModal,
         login,
         logout,
+        refreshUser,
         role,
         setRole,
         language,
