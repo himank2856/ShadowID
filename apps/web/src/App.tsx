@@ -97,7 +97,7 @@ const AppContent: React.FC = () => {
               <Shield className="w-3 h-3" />
             </div>
             <span>
-              <strong className="text-[#F1F5F9] font-normal">ShadowID</strong> — Build With Bharat 3.0 (Chitkara University, HP)
+              <strong className="text-[#F1F5F9] font-normal">ShadowID</strong> — Autonomous Forensic Identity Intelligence Platform
             </span>
           </div>
 
@@ -120,8 +120,8 @@ const AppContent: React.FC = () => {
             </a>
           </div>
 
-          <div className="text-[11px]">
-            Team GIGABYTE: <span className="text-[#CBD5E1]">Anshul, Tanishq & Himank</span>
+          <div className="text-[11px] font-mono-code text-[#94A3B8]">
+            DPDP Act 2023 Compliant • <span className="text-[#A3E635]">ISO 27001 Architecture</span>
           </div>
         </div>
       </footer>

@@ -71,7 +71,7 @@ export const Navbar: React.FC = () => {
             <span className={`w-1.5 h-1.5 rounded-full ${supabaseConfig.isConnected ? 'bg-[#A3E635]' : 'bg-[#38BDF8]'} inline-block animate-pulse`}></span>
           </button>
           <span className="text-[#64748B]">•</span>
-          <span>Chitkara Cyber Forensics Cell</span>
+          <span>Cyber Threat Intelligence & Forensics Division</span>
           <span className="text-[#64748B]">•</span>
           <span className="text-[#A3E635] flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" /> ISO 27001 Architecture

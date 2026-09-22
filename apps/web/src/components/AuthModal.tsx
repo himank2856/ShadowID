@@ -798,7 +798,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           type="text"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
-                          placeholder="e.g. Himank Sharma"
+                          placeholder="e.g. Aditi Sharma"
                           className="w-full bg-[#07111F] border border-[#1E3A5F] text-[#F1F5F9] rounded py-2 pl-9 pr-3 text-xs focus:outline-none focus:border-[#A3E635]"
                           required
                         />
@@ -971,7 +971,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             type="email"
                             value={resetEmail}
                             onChange={(e) => setResetEmail(e.target.value)}
-                            placeholder="e.g. himank2856@gmail.com or analyst@shadowid.in"
+                            placeholder="e.g. user@gmail.com or analyst@shadowid.in"
                             className="w-full bg-[#07111F] border border-[#1E3A5F] text-[#F1F5F9] rounded py-2 pl-9 pr-3 text-xs focus:outline-none focus:border-[#F59E0B]"
                             required
                           />

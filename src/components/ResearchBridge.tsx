@@ -86,7 +86,7 @@ export const ResearchBridge: React.FC<ResearchBridgeProps> = ({ claims }) => {
       {/* Vendor Prompt Box */}
       <div className="mt-4 p-3 bg-[#07111F] border border-[#1E3A5F] rounded">
         <div className="text-[10px] font-mono-code uppercase text-[#94A3B8] mb-1 flex items-center justify-between">
-          <span>Standardized Prompt Template (Prompt 14 Mandate)</span>
+          <span>Standardized Query Template (DPDP Privacy Safeguard)</span>
           <span className="text-[#38BDF8]">Strict Synthetic Boundary</span>
         </div>
         <p className="text-xs font-mono-code text-[#CBD5E1] bg-[#0F1D2E] p-2 rounded border border-[#1E3A5F]">

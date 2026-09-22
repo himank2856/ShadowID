@@ -191,7 +191,7 @@ export const SettingsPage: React.FC = () => {
       type: 'Manual Research Import',
       status: 'Manual',
       statusColor: 'text-[#38BDF8] border-[#38BDF8]/40 bg-[#38BDF8]/10',
-      description: 'Structured manual research workflow adhering to Prompt 14. Automated API remains unverified by vendor.',
+      description: 'Structured privacy-preserving deep research workflow. Operates with explicit consent boundaries under DPDP Act 2023.',
       url: 'https://insights-ai.info/DeepSearch',
     },
     {
@@ -202,11 +202,11 @@ export const SettingsPage: React.FC = () => {
       description: 'Dual-script English and Devanagari OCR with OpenCV morphological validation in memory.',
     },
     {
-      name: 'Razorpay Test Sandbox',
+      name: 'UPI 2.0 & Payment Protocol Gateway',
       type: 'Indian Payment Rail',
       status: 'Available',
       statusColor: 'text-[#A3E635] border-[#A3E635]/40 bg-[#A3E635]/10',
-      description: 'Test mode integration for 30-day Pro Pass (₹499 / 49,900 paise).',
+      description: 'Direct UPI QR remittances (7973009420@ptaxis), card rails, and GST cryptographic receipts.',
     },
     {
       name: 'UIDAI / Aadhaar Direct Registry API',

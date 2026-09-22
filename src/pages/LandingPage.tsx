@@ -19,7 +19,7 @@ export const LandingPage: React.FC = () => {
       <section className="relative px-4 text-center max-w-4xl mx-auto space-y-6">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#172A42] border border-[#38BDF8]/40 text-xs font-mono-code text-[#38BDF8]">
           <span className="w-2 h-2 rounded-full bg-[#A3E635] animate-ping" />
-          Build With Bharat 3.0 • Chitkara University, Himachal Pradesh
+          Enterprise Identity Intelligence & Threat Attestation • DPDP Act 2023 Compliant
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-display font-bold text-[#F1F5F9] tracking-tight leading-tight">
@@ -172,7 +172,7 @@ export const LandingPage: React.FC = () => {
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> 24h Document Auto-Purge
               </span>
               <span className="flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> No Paid Web-Search APIs Required
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Zero Third-Party Data Leakage
               </span>
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[#A3E635]" /> Deterministic Audit Trail

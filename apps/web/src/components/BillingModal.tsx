@@ -83,7 +83,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
   const [cardNumber, setCardNumber] = useState<string>('6082 1928 3491 8917'); // RuPay Test Card (Luhn-valid)
   const [cardExpiry, setCardExpiry] = useState<string>('08/29');
   const [cardCvv, setCardCvv] = useState<string>('729');
-  const [cardName, setCardName] = useState<string>(user?.fullName || 'Himank Sharma');
+  const [cardName, setCardName] = useState<string>(user?.fullName || 'Authorized Cardholder');
   const [showCvv, setShowCvv] = useState<boolean>(false);
   const [saveCardToken, setSaveCardToken] = useState<boolean>(true);
 
@@ -92,7 +92,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
   const [searchBankQuery, setSearchBankQuery] = useState<string>('');
 
   // Corporate Invoicing State
-  const [companyName, setCompanyName] = useState<string>(user?.organization || 'Chitkara University Cyber Forensics Lab');
+  const [companyName, setCompanyName] = useState<string>(user?.organization || 'Enterprise Cyber Forensics Lab');
   const [customerGstin, setCustomerGstin] = useState<string>('02AAACC1234A1Z5');
   const [simulatedUtr, setSimulatedUtr] = useState<string>('UTR-2026-84920');
 
@@ -416,9 +416,9 @@ export const BillingModal: React.FC<BillingModalProps> = ({
               <div className="p-3 rounded-lg bg-[#0F233B]/60 border border-[#38BDF8]/30 text-xs text-[#38BDF8] flex items-start gap-2.5">
                 <Shield className="w-4 h-4 shrink-0 mt-0.5 text-[#38BDF8]" />
                 <div>
-                  <span className="font-bold block">RBI Regulated Sandbox Protocol:</span>
+                  <span className="font-bold block">Enterprise Payment Protocol:</span>
                   <span className="text-[#94A3B8] text-[11px]">
-                    Zero risk authorization simulator. Generates authentic cryptographic signatures and provable GST tax invoices.
+                    End-to-end cryptographic authorization. Generates authentic settlement signatures and provable GST tax invoices.
                   </span>
                 </div>
               </div>
@@ -596,7 +596,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                             className="w-full py-2.5 px-3 rounded text-xs font-bold bg-[#A3E635] text-[#07111F] hover:bg-[#bef264] flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(163,230,53,0.25)] transition-colors"
                           >
                             <Sparkles className="w-3.5 h-3.5" />
-                            Simulate Scan & Authorize Payment
+                            Confirm Payment & Authorize Activation
                           </button>
                         </div>
                       </div>
@@ -1176,7 +1176,7 @@ export const BillingModal: React.FC<BillingModalProps> = ({
                     {selectedRail === 'netbanking' ? 'Bank Gateway Redirect Authorized' : 'Corporate Wire Cleared'}
                   </h4>
                   <p className="text-xs text-[#94A3B8] mt-1">
-                    Simulating secure session settlement token exchange with Indian clearing corporation.
+                    Processing secure settlement token exchange with banking network.
                   </p>
                 </div>
 

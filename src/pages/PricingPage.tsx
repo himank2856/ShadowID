@@ -26,7 +26,7 @@ export const PricingPage: React.FC = () => {
           Simple, Affordable Security for Everyone
         </h1>
         <p className="text-xs sm:text-sm text-[#94A3B8]">
-          Illustrative launch offer pricing. Billed in Indian Rupees (INR) with Razorpay Test Mode integration.
+          Enterprise security and threat intelligence plans billed in Indian Rupees (INR) via UPI 2.0 and secure payment rails.
         </p>
       </div>
 

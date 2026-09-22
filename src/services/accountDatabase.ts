@@ -49,7 +49,7 @@ const SEED_USERS: UserAccount[] = [
     phone: '+91 98881 29012',
     fullName: 'Himank Sharma',
     role: 'analyst',
-    organization: 'Chitkara Cyber Forensics Cell',
+    organization: 'Cyber Threat Intelligence & Forensics Cell',
     designation: 'Senior Forensic Analyst',
     isVerified: true,
     verificationMethod: 'otp_mobile',

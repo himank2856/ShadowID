@@ -100,7 +100,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             fullName: session.user.user_metadata?.full_name || email.split('@')[0],
             email: email,
             phone: session.user.phone || '+91 9876543210',
-            organization: 'Chitkara Cyber Forensics Cell',
+            organization: 'Cyber Threat Intelligence & Forensics Cell',
             role: 'analyst',
             isVerified: true,
             isEmailVerified: true,

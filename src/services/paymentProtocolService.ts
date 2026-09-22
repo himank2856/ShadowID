@@ -112,7 +112,7 @@ export const PLAN_CATALOGUE: Record<PaymentPlanId, PlanConfig> = {
       'Role-Based Access Control (Owner, Lead Analyst, Reviewer)',
       'Custom state registry adapters & university campus SSO',
       'Offline air-gapped forensic audit bundle packaging',
-      'SLA & Incident Review Attestation signed by Team GIGABYTE',
+      'SLA & Incident Review Attestation signed by ShadowID Forensics Team',
     ],
   },
 };
@@ -695,7 +695,7 @@ export const paymentProtocolService = {
       durationDays: order.durationDays,
       userEmail: currentUser?.email || 'analyst@shadowid.in',
       userName: currentUser?.fullName || 'Senior Forensic Investigator',
-      userOrganization: currentUser?.organization || 'Chitkara Cyber Forensics Cell',
+      userOrganization: currentUser?.organization || 'Enterprise Forensics Division',
       customerGstin: customerGstin || undefined,
       hsnSacCode: SUPPLIER_METADATA.hsnSacCode,
       supplierName: SUPPLIER_METADATA.name,

@@ -521,7 +521,7 @@ Regulatory Clearance: DPDP Act 2023 Section 12 & IT Act Section 66D.`;
       {/* Official Prompt 14 Manual Attestation Bridge */}
       <div className="space-y-3 pt-2">
         <div className="text-xs font-mono-code text-[#A3E635] uppercase flex items-center gap-1.5">
-          <Terminal className="w-3.5 h-3.5" /> Prompt 14 Attestation & iNSIGHTS Research Bridge
+          <Terminal className="w-3.5 h-3.5" /> Identity Attestation & Deep Research Bridge
         </div>
         <ResearchBridge claims={activeScan?.researchClaims || []} />
       </div>
