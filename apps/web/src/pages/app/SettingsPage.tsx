@@ -7,6 +7,7 @@ import {
   Settings,
   CreditCard,
   Shield,
+  ShieldCheck,
   Database,
   Trash2,
   CheckCircle2,
@@ -40,20 +41,18 @@ export const SettingsPage: React.FC = () => {
   // Email Verification State
   const [isEmailVerifyModalOpen, setIsEmailVerifyModalOpen] = useState(false);
   const [emailOtpDigits, setEmailOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [emailOtpPreview, setEmailOtpPreview] = useState<string | null>(null);
   const [emailOtpCountdown, setEmailOtpCountdown] = useState<number>(30);
   const [isVerifyingEmail, setIsVerifyingEmail] = useState<boolean>(false);
   const [emailVerifyError, setEmailVerifyError] = useState<string | null>(null);
 
-  const handleInitiateEmailVerification = () => {
+  const handleInitiateEmailVerification = async () => {
     if (!user) return;
     setEmailVerifyError(null);
-    const res = otpService.sendEmailOtp(user.email, 'signup');
-    setEmailOtpPreview(res.otpCodePreview);
     setEmailOtpCountdown(30);
     setEmailOtpDigits(['', '', '', '', '', '']);
     setIsEmailVerifyModalOpen(true);
-    showToast(`Verification OTP dispatched to ${user.email}`);
+    await otpService.sendEmailOtp(user.email, 'signup');
+    showToast(`Verification code sent to ${user.email}. Check your inbox/spam.`);
   };
 
   const handleConfirmEmailVerification = async (e: React.FormEvent) => {
@@ -664,31 +663,25 @@ export const SettingsPage: React.FC = () => {
                 <span className="text-[#38BDF8] font-mono-code font-bold">{user.email}</span>.
               </p>
 
-              {/* Simulated Mailbox Preview */}
-              <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-3.5 space-y-2">
+              {/* Secure Email Delivery Notice Card */}
+              <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-4 space-y-2.5">
                 <div className="flex items-center justify-between text-[11px] border-b border-[#172A42] pb-1.5 font-mono-code text-[#38BDF8]">
-                  <span>From: security@shadowid.in</span>
-                  <span className="text-[10px] text-[#A3E635]">Encrypted TLS</span>
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-[#38BDF8]" />
+                    <span className="font-semibold">Verification Dispatch</span>
+                  </div>
+                  <span className="text-[10px] text-[#A3E635] bg-[#A3E635]/10 px-1.5 py-0.5 rounded border border-[#A3E635]/30">
+                    Dispatched to Inbox
+                  </span>
                 </div>
                 <div className="text-xs text-[#F1F5F9] font-medium">
-                  Subject: [Action Required] Verify your ShadowID Analyst Account
+                  Verification code transmitted to <span className="text-[#38BDF8] font-mono-code">{user.email}</span>
                 </div>
-                <div className="flex items-center justify-between bg-[#0F1D2E] p-2 rounded border border-[#38BDF8]/30">
-                  <span className="text-base font-mono-code font-bold tracking-widest text-[#A3E635]">
-                    {emailOtpPreview || '••••••'}
-                  </span>
-                  {emailOtpPreview && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmailOtpDigits(emailOtpPreview.split(''));
-                        showToast('Verification code copied!');
-                      }}
-                      className="px-2 py-1 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] rounded text-[10px] font-mono-code flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3 h-3" /> Auto-fill
-                    </button>
-                  )}
+                <div className="text-[11px] text-[#94A3B8] bg-[#0F1D2E] p-2.5 rounded border border-[#1E3A5F] flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0 mt-0.5" />
+                  <p className="leading-snug">
+                    Under DPDP Act 2023 compliance, verification codes are <strong className="text-[#F1F5F9]">never displayed on screen</strong>. Please open your email inbox, find your code, and enter it below.
+                  </p>
                 </div>
               </div>
 

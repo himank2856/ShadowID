@@ -11,6 +11,7 @@ import { otpService } from '../services/otpService.ts';
 import { Role } from '../types.ts';
 import {
   Shield,
+  ShieldCheck,
   Lock,
   Mail,
   Phone,
@@ -134,7 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Trigger OTP Sign-In Initiation
-  const handleOtpSignInRequest = (e: React.FormEvent) => {
+  const handleOtpSignInRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -151,15 +152,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     const channel = cleanTarget.includes('@') ? 'email' : 'sms';
-    const res = otpService.generateAndSendOtp(cleanTarget, channel, 'login');
+    await otpService.generateAndSendOtp(cleanTarget, channel, 'login');
 
     setOtpTarget(cleanTarget);
     setOtpPurpose('login');
-    setDevOtpPreview(res.otpCodePreview);
     setOtpCountdown(30);
     setOtpDigits(['', '', '', '', '', '']);
     setIsOtpStep(true);
-    showToast(`Verification code sent to ${cleanTarget}`);
+    showToast(`Verification code dispatched to ${cleanTarget}. Check your inbox/spam.`);
   };
 
   // Trigger Sign-Up Submission
@@ -196,15 +196,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         verificationChannel: signupChannel,
       });
 
-      const res = otpService.generateAndSendOtp(target, channel, 'signup');
-
       setOtpTarget(target);
       setOtpPurpose('signup');
-      setDevOtpPreview(res.otpCodePreview);
       setOtpCountdown(30);
       setOtpDigits(['', '', '', '', '', '']);
       setIsOtpStep(true);
-      showToast(`Verification OTP dispatched to ${target} (${channel.toUpperCase()})`);
+      showToast(`Verification code sent to ${target}. Please check your email inbox.`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Account registration failed.');
     } finally {
@@ -228,11 +225,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const res = await accountDatabase.initiatePasswordReset(cleanEmail);
       setOtpTarget(cleanEmail);
       setOtpPurpose('reset_password');
-      setDevOtpPreview(res.previewCode || null);
       setOtpCountdown(30);
       setOtpDigits(['', '', '', '', '', '']);
       setResetStep('verify');
-      showToast(`Reset OTP code dispatched to ${cleanEmail}`);
+      showToast(`Password reset code dispatched to ${cleanEmail}. Check your inbox/spam.`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Unable to initiate password reset.');
     } finally {
@@ -320,7 +316,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Verify OTP submission
-  const handleVerifyOtpSubmit = (e: React.FormEvent) => {
+  const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -333,7 +329,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setIsLoading(true);
 
     try {
-      const verifyRes = accountDatabase.confirmUserOtpVerification(otpTarget, fullCode);
+      const verifyRes = await accountDatabase.confirmUserOtpVerification(otpTarget, fullCode);
       if (!verifyRes.success) {
         throw new Error(verifyRes.message);
       }
@@ -356,15 +352,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Resend OTP
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (otpCountdown > 0) return;
     setErrorMsg(null);
     const channel = otpTarget.includes('@') ? 'email' : 'sms';
-    const res = otpService.generateAndSendOtp(otpTarget, channel, otpPurpose);
-    setDevOtpPreview(res.otpCodePreview);
+    await otpService.generateAndSendOtp(otpTarget, channel, otpPurpose);
     setOtpCountdown(30);
     setOtpDigits(['', '', '', '', '', '']);
-    showToast(`New verification OTP sent to ${otpTarget}`);
+    showToast(`New verification code sent to ${otpTarget}. Check inbox/spam.`);
   };
 
   return (
@@ -410,69 +405,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </p>
               </div>
 
-              {/* Professional Simulated Analyst Mailbox Preview */}
+              {/* Secure Email Delivery Notice Card - Code NOT displayed on site */}
               {otpTarget.includes('@') ? (
-                <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-3.5 shadow-lg space-y-2.5">
+                <div className="bg-[#07111F] border border-[#1E3A5F] rounded-lg p-4 shadow-lg space-y-3">
                   <div className="flex items-center justify-between border-b border-[#172A42] pb-2 text-[11px] font-mono-code">
                     <div className="flex items-center gap-1.5 text-[#38BDF8]">
-                      <Mail className="w-3.5 h-3.5" />
-                      <span className="font-semibold">Simulated Secure Mailbox</span>
+                      <Mail className="w-4 h-4 text-[#38BDF8] animate-pulse" />
+                      <span className="font-semibold">Email Verification Dispatch</span>
                     </div>
-                    <span className="text-[10px] bg-[#38BDF8]/10 text-[#38BDF8] px-1.5 py-0.5 rounded border border-[#38BDF8]/30">
-                      TLS 1.3 Encrypted
+                    <span className="text-[10px] bg-[#A3E635]/10 text-[#A3E635] px-2 py-0.5 rounded border border-[#A3E635]/30 flex items-center gap-1 font-mono-code">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#A3E635] animate-ping" />
+                      Sent to Inbox
                     </span>
                   </div>
-                  <div className="text-xs space-y-1">
-                    <div className="text-[#94A3B8] text-[11px]">
-                      <span className="text-[#64748B]">Sender:</span> security@shadowid.in &bull; <span className="text-[#64748B]">To:</span> <span className="text-[#F1F5F9] font-mono-code">{otpTarget}</span>
-                    </div>
-                    <div className="text-[#F1F5F9] font-semibold text-xs">
-                      Subject: [Action Required] Verify your ShadowID Analyst Account
-                    </div>
-                    <p className="text-[11px] text-[#94A3B8] leading-relaxed pt-1">
-                      Your single-use 6-digit cryptographic verification code is:
+                  <div className="text-xs space-y-2">
+                    <p className="text-[#94A3B8] leading-relaxed">
+                      A single-use 6-digit cryptographic verification code has been transmitted directly to your email address:
                     </p>
-                    <div className="flex items-center justify-between bg-[#0F1D2E] p-2 rounded border border-[#38BDF8]/40 mt-1">
-                      <span className="text-lg font-mono-code font-bold tracking-widest text-[#A3E635]">
-                        {devOtpPreview || '••••••'}
+                    <div className="flex items-center justify-between bg-[#0F1D2E] p-2.5 rounded border border-[#38BDF8]/40">
+                      <span className="text-sm font-mono-code font-bold text-[#38BDF8] tracking-wide">
+                        {otpTarget}
                       </span>
-                      {devOtpPreview && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOtpDigits(devOtpPreview.split(''));
-                            showToast('Verification code copied and auto-filled!');
-                          }}
-                          className="px-2.5 py-1 bg-[#38BDF8]/20 hover:bg-[#38BDF8]/30 text-[#38BDF8] border border-[#38BDF8]/40 rounded text-[10px] font-mono-code flex items-center gap-1 transition-colors"
-                        >
-                          <Sparkles className="w-3 h-3" /> Auto-fill Code
-                        </button>
-                      )}
+                      <span className="text-[10px] text-[#A3E635] font-mono-code">Check Inbox / Spam</span>
+                    </div>
+                    <div className="text-[11px] text-[#94A3B8] bg-[#121E2F] p-2.5 rounded border border-[#1E3A5F]/60 flex items-start gap-2">
+                      <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0 mt-0.5" />
+                      <p className="leading-snug">
+                        For your security, verification codes are <strong className="text-[#F1F5F9]">never displayed on this website</strong>. Open your email inbox, find the code from <span className="text-[#38BDF8]">ShadowID Security</span>, and enter it below.
+                      </p>
                     </div>
                   </div>
                   <div className="text-[10px] text-[#64748B] flex items-center justify-between pt-1">
-                    <span>Valid for 5 minutes</span>
+                    <span>Valid for 10 minutes</span>
                     <span>DPDP Act 2023 Reg: S-ID-882</span>
                   </div>
                 </div>
               ) : (
-                devOtpPreview && (
-                  <div className="bg-[#172A42]/80 border border-[#A3E635]/40 rounded p-2.5 text-center text-xs">
-                    <div className="flex items-center justify-center gap-1.5 text-[#A3E635] font-mono-code">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>SMS Gateway Dispatch Code: <strong>{devOtpPreview}</strong></span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtpDigits(devOtpPreview.split(''));
-                      }}
-                      className="mt-1 text-[11px] text-[#38BDF8] underline hover:text-[#7dd3fc]"
-                    >
-                      Click to auto-fill code
-                    </button>
-                  </div>
-                )
+                <div className="bg-[#07111F] border border-[#1E3A5F] rounded p-3 text-xs text-[#94A3B8] flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0" />
+                  <span>SMS security code transmitted to {otpTarget}. Check your mobile inbox.</span>
+                </div>
               )}
 
               {/* Error Alert */}
@@ -969,26 +941,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           <span className="text-[#F59E0B] font-mono-code font-bold">{resetEmail}</span>
                         </div>
                         <div className="text-[11px] text-[#94A3B8]">
-                          Check your Gmail/email inbox for the 6-digit code.
+                          Check your email inbox (and spam folder) for the 6-digit verification code.
                         </div>
                       </div>
 
-                      {/* Dev OTP Helper */}
-                      {devOtpPreview && (
-                        <div className="bg-[#07111F] border border-[#A3E635]/40 rounded p-2 text-center text-xs">
-                          <div className="flex items-center justify-center gap-1 text-[#A3E635] font-mono-code">
-                            <Sparkles className="w-3 h-3" />
-                            <span>Dev Preview Code: <strong>{devOtpPreview}</strong></span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setOtpDigits(devOtpPreview.split(''))}
-                            className="mt-0.5 text-[10px] text-[#38BDF8] underline hover:text-[#7dd3fc]"
-                          >
-                            Auto-fill digits
-                          </button>
-                        </div>
-                      )}
+                      {/* Secure Email Dispatch Note */}
+                      <div className="bg-[#07111F] border border-[#1E3A5F] rounded p-2.5 text-xs text-[#94A3B8] flex items-start gap-2">
+                        <ShieldCheck className="w-4 h-4 text-[#A3E635] shrink-0 mt-0.5" />
+                        <p className="text-[11px] leading-snug">
+                          For your security, reset codes are <strong className="text-[#F1F5F9]">never displayed on screen</strong>. Please open your email to retrieve the 6-digit code.
+                        </p>
+                      </div>
 
                       {/* 6 Digit Input Boxes */}
                       <div>
@@ -1071,12 +1034,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            const res = otpService.sendPasswordResetOtp(resetEmail);
-                            setDevOtpPreview(res.otpCodePreview);
+                          onClick={async () => {
+                            await otpService.sendPasswordResetOtp(resetEmail);
                             setOtpCountdown(30);
                             setOtpDigits(['', '', '', '', '', '']);
-                            showToast(`New reset code sent to ${resetEmail}`);
+                            showToast(`New reset code sent to ${resetEmail}. Check your inbox/spam.`);
                           }}
                           disabled={otpCountdown > 0}
                           className="text-[#38BDF8] hover:text-[#7dd3fc] disabled:text-[#64748B]"

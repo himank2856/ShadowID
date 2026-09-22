@@ -10,6 +10,7 @@ import { SYNTHETIC_CASES, calculateShadowScore } from '../data/syntheticDatasets
 import { TRANSLATIONS } from '../utils/formatters.ts';
 import { accountDatabase } from '../services/accountDatabase.ts';
 import { paymentProtocolService } from '../services/paymentProtocolService.ts';
+import { supabaseService } from '../services/supabaseService.ts';
 
 interface AppContextType {
   currentRoute: string;
@@ -77,6 +78,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isPro, setIsPro] = useState<boolean>(() => user?.isPro || false);
   const [latestReceipt, setLatestReceipt] = useState<PaymentReceipt | null>(() => paymentProtocolService.getReceipts()[0] || null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Listen to Supabase Auth state changes for email verification & magic links
+  useEffect(() => {
+    const client = supabaseService.getClient();
+    if (!client) return;
+
+    const { data: { subscription } } = client.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user?.email) {
+        const email = session.user.email;
+        const existingUser = accountDatabase.findByEmailOrPhone(email);
+        if (existingUser) {
+          existingUser.isVerified = true;
+          existingUser.isEmailVerified = true;
+          accountDatabase.setActiveSession(existingUser);
+          setUser({ ...existingUser });
+          showToast(`Email ${email} verified successfully via security email!`);
+        } else if (event === 'SIGNED_IN') {
+          const newUser: UserAccount = {
+            id: session.user.id || `usr-${Date.now()}`,
+            fullName: session.user.user_metadata?.full_name || email.split('@')[0],
+            email: email,
+            phone: session.user.phone || '+91 9876543210',
+            organization: 'Chitkara Cyber Forensics Cell',
+            role: 'analyst',
+            isVerified: true,
+            isEmailVerified: true,
+            verificationMethod: 'otp_email',
+            isPro: false,
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+          };
+          accountDatabase.setActiveSession(newUser);
+          setUser(newUser);
+          showToast(`Signed in and verified via email: ${email}`);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const openAuthModal = (tab: 'signin' | 'signup' = 'signin') => {
     setAuthModalTab(tab);

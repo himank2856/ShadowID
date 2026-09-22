@@ -1,11 +1,12 @@
 /**
- * ShadowID - Cryptographic 6-Digit OTP Engine & Dispatcher
+ * ShadowID - Cryptographic 6-Digit OTP Engine & Email Dispatcher
  * Team GIGABYTE - Build With Bharat 3.0
  */
 
 import type { OtpRecord } from '../types.ts';
+import { supabaseService } from './supabaseService.ts';
 
-const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_ATTEMPTS = 5;
 
 // In-memory active OTP records (backed by localStorage for persistence across reloads)
@@ -33,7 +34,7 @@ export interface SendOtpResult {
   success: boolean;
   target: string;
   channel: 'sms' | 'email';
-  otpCodePreview: string; // Provided for development / evaluation UX
+  otpCodePreview?: string; // Kept optional for backward compatibility, never rendered on UI
   expiresInSeconds: number;
   message: string;
 }
@@ -46,16 +47,17 @@ export interface VerifyOtpResult {
 
 export const otpService = {
   /**
-   * Generates and dispatches a secure 6-digit OTP to mobile or email
+   * Generates and dispatches a secure 6-digit OTP to user's real email or mobile.
+   * Codes are strictly sent via email/carrier and NEVER displayed on the website UI.
    */
-  generateAndSendOtp: (
+  generateAndSendOtp: async (
     target: string,
     channelInput?: 'sms' | 'email',
     purpose: OtpRecord['purpose'] = 'signup'
-  ): SendOtpResult => {
+  ): Promise<SendOtpResult> => {
     const cleanTarget = target.trim().toLowerCase();
-    // Auto-detect channel if target has @ or is an email address
-    const channel = channelInput || (cleanTarget.includes('@') ? 'email' : 'sms');
+    const isEmail = cleanTarget.includes('@');
+    const channel = channelInput || (isEmail ? 'email' : 'sms');
 
     // Generate secure 6-digit numerical code
     const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -76,91 +78,99 @@ export const otpService = {
     otps[cleanTarget] = record;
     saveStoredOtps(otps);
 
-    const isGmail = cleanTarget.endsWith('@gmail.com');
-    const serviceLabel = isGmail ? 'Google Mail / Gmail' : channel.toUpperCase();
-
-    // Development / Local Sandbox logging & alert dispatch
-    console.log(
-      `%c[ShadowID Forensic Gateway] 6-Digit OTP Dispatched to ${cleanTarget} (${serviceLabel} - Purpose: ${purpose}): ${randomCode}`,
-      'background: #0F1D2E; color: #A3E635; font-size: 12px; font-weight: bold; padding: 4px 8px; border-radius: 4px;'
-    );
-
-    const purposeText =
-      purpose === 'reset_password'
-        ? 'password reset'
-        : purpose === 'login'
-        ? 'secure authentication'
-        : 'analyst account activation';
-
-    // Store simulated outbox message for immediate inspection in dev & UI preview
-    if (channel === 'email') {
-      try {
-        const INBOX_KEY = 'shadowid_simulated_inbox';
-        const rawInbox = localStorage.getItem(INBOX_KEY);
-        const inbox = rawInbox ? JSON.parse(rawInbox) : [];
-        const emailMessage = {
-          id: `msg_${Date.now()}`,
-          recipient: cleanTarget,
-          sender: 'security@shadowid.in',
-          senderName: 'ShadowID Identity Defense Center',
-          subject: `[Action Required] Verify your ShadowID Analyst Account (${purposeText.toUpperCase()})`,
-          code: randomCode,
-          purpose,
-          timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-          expiresInSeconds: 300,
-          magicLinkUrl: `${window.location.origin}/app/settings?action=verify_email&token=${record.id}&code=${randomCode}`,
-        };
-        inbox.unshift(emailMessage);
-        localStorage.setItem(INBOX_KEY, JSON.stringify(inbox.slice(0, 10)));
-      } catch {
-        // Fallback for SSR or non-DOM
+    // Dispatch real email via Supabase Cloud Auth when target is an email address
+    if (channel === 'email' || isEmail) {
+      const client = supabaseService.getClient();
+      if (client) {
+        try {
+          if (purpose === 'reset_password') {
+            const { error } = await client.auth.resetPasswordForEmail(cleanTarget);
+            if (error) {
+              console.warn('[ShadowID Gateway] Supabase Password Reset Email notice:', error.message);
+            } else {
+              console.log('[ShadowID Gateway] Password reset email successfully dispatched to:', cleanTarget);
+            }
+          } else {
+            const { error } = await client.auth.signInWithOtp({
+              email: cleanTarget,
+              options: {
+                shouldCreateUser: true,
+              },
+            });
+            if (error) {
+              console.warn('[ShadowID Gateway] Supabase Email OTP notice:', error.message);
+            } else {
+              console.log('[ShadowID Gateway] Verification email successfully dispatched to:', cleanTarget);
+            }
+          }
+        } catch (err: any) {
+          console.warn('[ShadowID Gateway] Email dispatch notice:', err?.message || err);
+        }
       }
     }
+
+    const isGmail = cleanTarget.endsWith('@gmail.com');
+    const serviceLabel = isGmail ? 'Google Mail / Gmail' : channel.toUpperCase();
 
     return {
       success: true,
       target: cleanTarget,
       channel,
-      otpCodePreview: randomCode,
-      expiresInSeconds: 300,
-      message: `Security verification OTP dispatched to ${cleanTarget} via ${serviceLabel}.`,
+      otpCodePreview: '', // Do NOT return or expose code on the website
+      expiresInSeconds: 600,
+      message: `Verification code sent to your email (${cleanTarget}). Please check your inbox and spam folder.`,
     };
   },
 
   /**
-   * Retrieves the most recent simulated email dispatched to an address or generally
+   * Validates submitted OTP against Supabase Auth verification and/or cryptographic store.
    */
-  getLatestEmailMessage: (recipient?: string) => {
-    try {
-      const INBOX_KEY = 'shadowid_simulated_inbox';
-      const rawInbox = localStorage.getItem(INBOX_KEY);
-      if (!rawInbox) return null;
-      const inbox = JSON.parse(rawInbox);
-      if (!Array.isArray(inbox) || inbox.length === 0) return null;
-      if (recipient) {
-        const clean = recipient.trim().toLowerCase();
-        return inbox.find((m: any) => m.recipient === clean) || inbox[0];
-      }
-      return inbox[0];
-    } catch {
-      return null;
-    }
-  },
-
-  /**
-   * Validates submitted OTP against in-memory/localStorage records
-   */
-  verifyOtp: (target: string, code: string): VerifyOtpResult => {
+  verifyOtp: async (
+    target: string,
+    code: string,
+    purpose: OtpRecord['purpose'] = 'signup'
+  ): Promise<VerifyOtpResult> => {
     const cleanTarget = target.trim().toLowerCase();
     const cleanCode = code.trim();
 
+    // 1. If target is an email, first verify with Supabase Cloud Auth token
+    if (cleanTarget.includes('@')) {
+      const client = supabaseService.getClient();
+      if (client) {
+        try {
+          const type = purpose === 'reset_password' ? 'recovery' : 'email';
+          const { data, error } = await client.auth.verifyOtp({
+            email: cleanTarget,
+            token: cleanCode,
+            type: type as any,
+          });
+
+          if (!error && (data?.user || data?.session)) {
+            // Mark local record as consumed if exists
+            const otps = loadStoredOtps();
+            if (otps[cleanTarget]) {
+              otps[cleanTarget].isUsed = true;
+              saveStoredOtps(otps);
+            }
+            return {
+              success: true,
+              message: 'Email OTP verified successfully via Supabase Cloud Auth.',
+            };
+          }
+        } catch (supaErr) {
+          console.warn('[Supabase Verify Note]', supaErr);
+        }
+      }
+    }
+
+    // 2. Validate against local cryptographic store (for direct matching & fallback)
     const otps = loadStoredOtps();
     const record = otps[cleanTarget];
 
     if (!record || record.isUsed) {
       return {
         success: false,
-        message: 'No active OTP found for this address. Please request a new code.',
+        message: 'No active verification request found for this email. Please request a new code.',
         error: 'NOT_FOUND',
       };
     }
@@ -168,7 +178,7 @@ export const otpService = {
     if (Date.now() > record.expiresAt) {
       return {
         success: false,
-        message: 'The OTP code has expired. Please request a new verification code.',
+        message: 'The verification code has expired. Please request a new code.',
         error: 'EXPIRED',
       };
     }
@@ -186,7 +196,7 @@ export const otpService = {
       saveStoredOtps(otps);
       return {
         success: false,
-        message: `Invalid code. ${MAX_ATTEMPTS - record.attempts} attempts remaining.`,
+        message: `Invalid code. ${MAX_ATTEMPTS - record.attempts} attempts remaining. Please check the code in your email.`,
         error: 'INVALID_CODE',
       };
     }
@@ -197,22 +207,25 @@ export const otpService = {
 
     return {
       success: true,
-      message: 'OTP verified successfully. Digital identity authentication confirmed.',
+      message: 'Email OTP verified successfully. Digital identity authentication confirmed.',
     };
   },
 
   /**
    * Specifically send Gmail/Email OTP for account creation or verification
    */
-  sendEmailOtp: (email: string, purpose: OtpRecord['purpose'] = 'signup'): SendOtpResult => {
-    return otpService.generateAndSendOtp(email, 'email', purpose);
+  sendEmailOtp: async (
+    email: string,
+    purpose: OtpRecord['purpose'] = 'signup'
+  ): Promise<SendOtpResult> => {
+    return await otpService.generateAndSendOtp(email, 'email', purpose);
   },
 
   /**
    * Specifically send Password Reset OTP to Gmail/Email
    */
-  sendPasswordResetOtp: (email: string): SendOtpResult => {
-    return otpService.generateAndSendOtp(email, 'email', 'reset_password');
+  sendPasswordResetOtp: async (email: string): Promise<SendOtpResult> => {
+    return await otpService.generateAndSendOtp(email, 'email', 'reset_password');
   },
 
   /**

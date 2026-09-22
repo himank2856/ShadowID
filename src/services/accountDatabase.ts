@@ -229,8 +229,8 @@ export const accountDatabase = {
     const channel = data.verificationChannel || (cleanEmail ? 'email' : 'sms');
     const otpTarget = channel === 'email' ? cleanEmail : cleanPhone;
 
-    // Trigger initial OTP verification
-    otpService.generateAndSendOtp(otpTarget, channel, 'signup');
+    // Trigger initial OTP verification (send real email / SMS)
+    await otpService.generateAndSendOtp(otpTarget, channel, 'signup');
 
     logAuditEvent(newUser.id, 'REGISTRATION', `User registered: ${cleanEmail} (Verification channel: ${channel.toUpperCase()})`);
 
@@ -277,11 +277,11 @@ export const accountDatabase = {
   /**
    * Verify User's OTP and promote to Verified status
    */
-  confirmUserOtpVerification: (
+  confirmUserOtpVerification: async (
     target: string,
     code: string
-  ): { success: boolean; user?: UserAccount; message: string } => {
-    const verifyRes = otpService.verifyOtp(target, code);
+  ): Promise<{ success: boolean; user?: UserAccount; message: string }> => {
+    const verifyRes = await otpService.verifyOtp(target, code, 'signup');
     if (!verifyRes.success) {
       return { success: false, message: verifyRes.message };
     }
@@ -290,6 +290,7 @@ export const accountDatabase = {
     if (user) {
       user.isVerified = true;
       user.verificationMethod = target.includes('@') ? 'otp_email' : 'otp_mobile';
+      user.isEmailVerified = target.includes('@') ? true : user.isEmailVerified;
       user.verifiedAt = new Date().toISOString();
 
       const users = loadUsers();
@@ -297,7 +298,7 @@ export const accountDatabase = {
       saveUsers(users);
       accountDatabase.setActiveSession(user);
 
-      logAuditEvent(user.id, 'OTP_VERIFIED', `Contact verified via OTP: ${target}`);
+      logAuditEvent(user.id, 'OTP_VERIFIED', `Contact verified via email/OTP: ${target}`);
       return {
         success: true,
         user,
@@ -314,12 +315,12 @@ export const accountDatabase = {
   /**
    * Explicitly verify user's email address with 6-digit OTP
    */
-  verifyUserEmail: (
+  verifyUserEmail: async (
     userId: string,
     email: string,
     code: string
-  ): { success: boolean; user?: UserAccount; message: string } => {
-    const verifyRes = otpService.verifyOtp(email, code);
+  ): Promise<{ success: boolean; user?: UserAccount; message: string }> => {
+    const verifyRes = await otpService.verifyOtp(email, code, 'verify_email');
     if (!verifyRes.success) {
       return { success: false, message: verifyRes.message };
     }
@@ -333,6 +334,7 @@ export const accountDatabase = {
     if (targetUser) {
       targetUser.email = email.trim().toLowerCase();
       targetUser.isVerified = true;
+      targetUser.isEmailVerified = true;
       targetUser.verificationMethod = 'otp_email';
       targetUser.verifiedAt = new Date().toISOString();
 
@@ -388,18 +390,17 @@ export const accountDatabase = {
    */
   initiatePasswordReset: async (
     email: string
-  ): Promise<{ success: boolean; target: string; previewCode?: string; message: string }> => {
+  ): Promise<{ success: boolean; target: string; message: string }> => {
     const cleanEmail = email.trim().toLowerCase();
     const user = accountDatabase.findByEmailOrPhone(cleanEmail);
     if (!user) {
       throw new Error(`No account registered with "${cleanEmail}". Please check your email or create a new account.`);
     }
 
-    const res = otpService.sendPasswordResetOtp(cleanEmail);
+    const res = await otpService.sendPasswordResetOtp(cleanEmail);
     return {
       success: true,
       target: cleanEmail,
-      previewCode: res.otpCodePreview,
       message: res.message,
     };
   },
@@ -422,7 +423,7 @@ export const accountDatabase = {
       throw new Error('New password must be at least 6 characters long.');
     }
 
-    const verifyRes = otpService.verifyOtp(cleanEmail, otpCode);
+    const verifyRes = await otpService.verifyOtp(cleanEmail, otpCode, 'reset_password');
     if (!verifyRes.success) {
       throw new Error(verifyRes.message);
     }
@@ -431,7 +432,7 @@ export const accountDatabase = {
     creds[cleanEmail] = newPassword;
     saveCredentials(creds);
 
-    logAuditEvent(user.id, 'PASSWORD_RESET', `Password reset successfully via Gmail/Email OTP: ${cleanEmail}`);
+    logAuditEvent(user.id, 'PASSWORD_RESET', `Password reset successfully via email verification: ${cleanEmail}`);
 
     // Sync updated user to Supabase
     supabaseService.syncUser(user);
