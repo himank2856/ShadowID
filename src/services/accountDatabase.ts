@@ -54,8 +54,7 @@ const SEED_USERS: UserAccount[] = [
     isVerified: true,
     verificationMethod: 'otp_mobile',
     verifiedAt: '2026-09-21T10:00:00Z',
-    isPro: true,
-    passExpiryDate: '21 Oct 2026, 23:59 IST',
+    isPro: false,
     createdAt: '2026-09-20T08:00:00Z',
     lastLoginAt: '2026-09-22T02:30:00Z',
   },
@@ -70,8 +69,7 @@ const SEED_USERS: UserAccount[] = [
     isVerified: true,
     verificationMethod: 'otp_email',
     verifiedAt: '2026-09-21T11:00:00Z',
-    isPro: true,
-    passExpiryDate: '21 Dec 2026, 23:59 IST',
+    isPro: false,
     createdAt: '2026-09-18T10:00:00Z',
     lastLoginAt: '2026-09-22T01:15:00Z',
   },
@@ -81,15 +79,26 @@ const SEED_USERS: UserAccount[] = [
 function loadUsers(): Record<string, UserAccount> {
   try {
     const raw = localStorage.getItem(USERS_DB_KEY);
+    const hasReceipts = !!localStorage.getItem('shadowid_db_receipts');
     if (!raw) {
       const initial: Record<string, UserAccount> = {};
       SEED_USERS.forEach((u) => {
-        initial[u.email.toLowerCase()] = u;
+        initial[u.email.toLowerCase()] = { ...u, isPro: false };
       });
       localStorage.setItem(USERS_DB_KEY, JSON.stringify(initial));
       return initial;
     }
-    return JSON.parse(raw);
+    const users: Record<string, UserAccount> = JSON.parse(raw);
+    // If no real receipts exist, ensure accounts are not falsely marked isPro: true
+    if (!hasReceipts) {
+      Object.values(users).forEach((u) => {
+        if (u.isPro) {
+          u.isPro = false;
+          u.passExpiryDate = undefined;
+        }
+      });
+    }
+    return users;
   } catch {
     return {};
   }
@@ -365,7 +374,13 @@ export const accountDatabase = {
     try {
       const raw = localStorage.getItem(SESSION_DB_KEY);
       if (!raw) return null;
-      return JSON.parse(raw);
+      const user: UserAccount = JSON.parse(raw);
+      const hasReceipts = !!localStorage.getItem('shadowid_db_receipts');
+      if (!hasReceipts && user.isPro) {
+        user.isPro = false;
+        user.passExpiryDate = undefined;
+      }
+      return user;
     } catch {
       return null;
     }
@@ -378,6 +393,21 @@ export const accountDatabase = {
     } catch (err) {
       console.error('Session persistence failure:', err);
     }
+  },
+
+  upgradeUserToPro: (userId: string, expiry: string): UserAccount | null => {
+    const users = loadUsers();
+    const user = Object.values(users).find((u) => u.id === userId);
+    if (user) {
+      user.isPro = true;
+      user.passExpiryDate = expiry;
+      users[user.email.toLowerCase()] = user;
+      saveUsers(users);
+      accountDatabase.setActiveSession(user);
+      logAuditEvent(user.id, 'PAYMENT_COMPLETED' as any, `Pro membership activated until ${expiry}`);
+      return user;
+    }
+    return null;
   },
 
   clearActiveSession: (): void => {
